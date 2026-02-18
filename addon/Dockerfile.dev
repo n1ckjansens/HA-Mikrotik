@@ -1,0 +1,11 @@
+FROM golang:1.22-alpine
+
+RUN apk add --no-cache ca-certificates git build-base
+RUN go install github.com/air-verse/air@v1.52.3
+
+WORKDIR /workspace/addon
+
+ENV GOCACHE=/tmp/go-build
+ENV CGO_ENABLED=0
+
+CMD ["air", "-c", ".air.toml"]

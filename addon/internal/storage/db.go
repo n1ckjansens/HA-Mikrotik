@@ -73,8 +73,35 @@ func (r *Repository) migrate(ctx context.Context) error {
 			return fmt.Errorf("migrate failed: %w", err)
 		}
 	}
-	_, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_devices_state_online ON devices_state(online);`)
-	return err
+	if _, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_devices_state_online ON devices_state(online);`); err != nil {
+		return err
+	}
+	return r.normalizeLegacyMACKeys(ctx)
+}
+
+func (r *Repository) normalizeLegacyMACKeys(ctx context.Context) error {
+	tables := []string{"devices_registered", "devices_state", "devices_new_cache"}
+	for _, table := range tables {
+		updateStmt := "UPDATE OR IGNORE " + table + " SET mac = REPLACE(REPLACE(UPPER(TRIM(mac)), '%3A', ':'), '-', ':') " +
+			"WHERE mac LIKE '%3A%' OR mac LIKE '%3a%' OR mac LIKE '%-%' OR mac != UPPER(mac) OR mac != TRIM(mac);"
+		res, err := r.db.ExecContext(ctx, updateStmt)
+		if err != nil {
+			return fmt.Errorf("legacy mac normalization failed for %s: %w", table, err)
+		}
+		if rows, _ := res.RowsAffected(); rows > 0 && r.logger != nil {
+			r.logger.Info("normalized legacy mac rows", "table", table, "rows", rows)
+		}
+
+		deleteStmt := "DELETE FROM " + table + " WHERE mac LIKE '%3A%' OR mac LIKE '%3a%';"
+		res, err = r.db.ExecContext(ctx, deleteStmt)
+		if err != nil {
+			return fmt.Errorf("legacy mac cleanup failed for %s: %w", table, err)
+		}
+		if rows, _ := res.RowsAffected(); rows > 0 && r.logger != nil {
+			r.logger.Warn("removed conflicting legacy mac rows", "table", table, "rows", rows)
+		}
+	}
+	return nil
 }
 
 func toTimePtr(v sql.NullString) *time.Time {

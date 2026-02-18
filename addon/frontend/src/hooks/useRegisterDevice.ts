@@ -4,12 +4,15 @@ import { patchDevice, refreshDevices, registerDevice, type RegisterDeviceInput }
 
 export function useRegisterDevice() {
   const client = useQueryClient();
+  const refreshMutation = useMutation({
+    mutationFn: () => refreshDevices()
+  });
 
   const registerMutation = useMutation({
     mutationFn: ({ mac, input }: { mac: string; input: RegisterDeviceInput }) =>
       registerDevice(mac, input),
     onSuccess: async () => {
-      await refreshDevices();
+      await refreshMutation.mutateAsync();
       await client.invalidateQueries({ queryKey: ["devices"] });
     }
   });
@@ -24,12 +27,17 @@ export function useRegisterDevice() {
   });
 
   return {
+    refreshMutation,
     registerMutation,
     patchMutation,
-    registerByMac(mac: string) {
-      registerMutation.mutate({
+    async registerWithName(mac: string, name: string) {
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        return;
+      }
+      await registerMutation.mutateAsync({
         mac,
-        input: { name: `Device ${mac.slice(-5)}` }
+        input: { name: trimmedName }
       });
     }
   };

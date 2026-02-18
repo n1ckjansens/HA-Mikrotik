@@ -1,0 +1,66 @@
+services:
+  mock-routeros:
+    image: python:3.12-alpine
+    container_name: mikrotik-presence-mock-routeros
+    working_dir: /app
+    volumes:
+      - ./dev/mock-routeros:/app
+    command: ["python", "/app/mock_routeros.py"]
+    ports:
+      - "18080:18080"
+
+  mock-ha:
+    image: python:3.12-alpine
+    container_name: mikrotik-presence-mock-ha
+    working_dir: /app
+    volumes:
+      - ./dev/mock-ha:/app
+    env_file:
+      - .env.dev
+    command: ["python", "/app/mock_ha.py"]
+    depends_on:
+      - mock-routeros
+    ports:
+      - "8123:8123"
+
+  backend:
+    build:
+      context: ./addon
+      dockerfile: Dockerfile.dev
+    container_name: mikrotik-presence-backend
+    working_dir: /workspace/addon
+    volumes:
+      - ./addon:/workspace/addon
+      - addon_go_mod:/go/pkg/mod
+      - addon_data:/data
+    environment:
+      HTTP_ADDR: :8099
+      DB_PATH: /data/mikrotik_presence.db
+      HA_BASE_URL: http://mock-ha:8123
+      FRONTEND_DIST: /workspace/addon/web
+      SUPERVISOR_TOKEN: ""
+    depends_on:
+      - mock-ha
+    ports:
+      - "8099:8099"
+
+  frontend:
+    image: node:20-alpine
+    container_name: mikrotik-presence-frontend
+    working_dir: /workspace/addon/frontend
+    volumes:
+      - ./addon:/workspace/addon
+      - addon_frontend_node_modules:/workspace/addon/frontend/node_modules
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_API_PROXY_TARGET: http://backend:8099
+    command: ["sh", "-lc", "npm install && npm run dev -- --host 0.0.0.0 --port 5173"]
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+
+volumes:
+  addon_go_mod:
+  addon_data:
+  addon_frontend_node_modules:

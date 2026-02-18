@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import { DeviceCard } from "@/components/device/DeviceCard";
+import { DeviceGroupDivider } from "@/components/device/DeviceGroupDivider";
+import { RegisterDevicePrompt } from "@/components/device/RegisterDevicePrompt";
 import { DeviceRow } from "@/components/device/DeviceRow";
 import { AppShell } from "@/components/layout/AppShell";
 import { Header } from "@/components/layout/Header";
@@ -12,17 +14,19 @@ import { ApiError } from "@/api/client";
 import { useDevice } from "@/hooks/useDevice";
 import { useDevices } from "@/hooks/useDevices";
 import { useFilters } from "@/hooks/useFilters";
-import { useRegisterDevice } from "@/hooks/useRegisterDevice";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { useRegisterDialog } from "@/hooks/useRegisterDialog";
 
 export function DevicesPage() {
   const filters = useFilters();
   const devicesQuery = useDevices(filters.params);
-  const register = useRegisterDevice();
+  const registerDialog = useRegisterDialog();
+  const isMobile = useIsMobile();
 
   const [selectedMac, setSelectedMac] = useState<string | null>(null);
   const detailQuery = useDevice(selectedMac);
 
-  const isBusy = register.registerMutation.isPending || register.patchMutation.isPending;
+  const isBusy = registerDialog.isSaving;
 
   const integrationNotConfigured = useMemo(() => {
     if (!(devicesQuery.error instanceof ApiError)) {
@@ -84,15 +88,23 @@ export function DevicesPage() {
       </div>
 
       <div className="grid gap-3">
-        {devicesQuery.data?.map((device) => (
-          <DeviceRow
-            key={device.mac}
-            device={device}
-            busy={isBusy}
-            onOpenDetails={(mac) => setSelectedMac(mac)}
-            onRegister={register.registerByMac}
-          />
-        ))}
+        {devicesQuery.data?.map((device, index, items) => {
+          const prev = index > 0 ? items[index - 1] : null;
+          const showRegisteredDivider =
+            filters.status === "all" && prev?.status === "new" && device.status === "registered";
+
+          return (
+            <Fragment key={device.mac}>
+              {showRegisteredDivider ? <DeviceGroupDivider label="Registered" /> : null}
+              <DeviceRow
+                device={device}
+                busy={isBusy}
+                onOpenDetails={(mac) => setSelectedMac(mac)}
+                onRegister={registerDialog.openForDevice}
+              />
+            </Fragment>
+          );
+        })}
       </div>
 
       <DeviceCard
@@ -103,6 +115,24 @@ export function DevicesPage() {
           }
         }}
         device={detailQuery.data ?? null}
+        isMobile={isMobile}
+      />
+
+      <RegisterDevicePrompt
+        device={registerDialog.target}
+        isMobile={isMobile}
+        open={registerDialog.isOpen}
+        name={registerDialog.name}
+        isSaving={registerDialog.isSaving}
+        onOpenChange={(open) => {
+          if (!open) {
+            registerDialog.close();
+          }
+        }}
+        onNameChange={registerDialog.setName}
+        onSave={() => {
+          void registerDialog.save();
+        }}
       />
     </AppShell>
   );

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -61,6 +62,10 @@ func (s *Service) persistSnapshot(ctx context.Context, observed map[string]model
 	if err != nil {
 		return err
 	}
+	registered, err := s.repo.ListRegistered(ctx)
+	if err != nil {
+		return err
+	}
 	newCache, err := s.repo.ListNewCache(ctx)
 	if err != nil {
 		return err
@@ -77,10 +82,17 @@ func (s *Service) persistSnapshot(ctx context.Context, observed map[string]model
 
 	states := make([]model.DeviceState, 0, len(allMACs))
 	cacheRows := make([]model.DeviceNewCache, 0, len(observed))
+	deleteMACs := make([]string, 0)
 
 	for mac := range allMACs {
 		prev, hadPrev := prevStates[mac]
 		obs, hasObs := observed[mac]
+		_, isRegistered := registered[mac]
+
+		if !isRegistered && (!hasObs || !obs.Online) {
+			deleteMACs = append(deleteMACs, mac)
+			continue
+		}
 
 		next := model.DeviceState{MAC: mac, UpdatedAt: now}
 		if hadPrev {
@@ -117,8 +129,16 @@ func (s *Service) persistSnapshot(ctx context.Context, observed map[string]model
 			if cache.FirstSeenAt.IsZero() {
 				cache.FirstSeenAt = now
 			}
-			cache.Vendor = obs.Vendor
-			cache.GeneratedName = obs.Generated
+			if obs.Vendor != "" && obs.Vendor != "Unknown" {
+				cache.Vendor = obs.Vendor
+			} else if strings.TrimSpace(cache.Vendor) == "" {
+				cache.Vendor = obs.Vendor
+			}
+			if hostName := strings.TrimSpace(obs.HostName); hostName != "" {
+				cache.GeneratedName = hostName
+			} else if strings.TrimSpace(cache.GeneratedName) == "" || strings.HasPrefix(cache.GeneratedName, "Device-") {
+				cache.GeneratedName = obs.Generated
+			}
 			cacheRows = append(cacheRows, cache)
 		} else {
 			next.Online = false
@@ -132,6 +152,14 @@ func (s *Service) persistSnapshot(ctx context.Context, observed map[string]model
 	}
 	if len(cacheRows) > 0 {
 		if err := s.repo.UpsertNewCache(ctx, cacheRows); err != nil {
+			return err
+		}
+	}
+	if len(deleteMACs) > 0 {
+		if err := s.repo.DeleteStates(ctx, deleteMACs); err != nil {
+			return err
+		}
+		if err := s.repo.DeleteNewCache(ctx, deleteMACs); err != nil {
 			return err
 		}
 	}
@@ -154,14 +182,29 @@ func (s *Service) ListDevices(ctx context.Context, filter ListFilter) ([]model.D
 
 	items := storage.MergeDeviceViews(states, registered, newCache)
 	filtered := filterViews(items, filter)
-	sort.Slice(filtered, func(i, j int) bool {
-		if filtered[i].Online != filtered[j].Online {
-			return filtered[i].Online
+	sort.SliceStable(filtered, func(i, j int) bool {
+		a := filtered[i]
+		b := filtered[j]
+
+		aRank := statusRank(a.Status)
+		bRank := statusRank(b.Status)
+		if aRank != bRank {
+			return aRank < bRank
 		}
-		if filtered[i].Status != filtered[j].Status {
-			return filtered[i].Status < filtered[j].Status
+
+		aTime := primarySortTime(a)
+		bTime := primarySortTime(b)
+		if !aTime.Equal(bTime) {
+			return aTime.After(bTime)
 		}
-		return filtered[i].Name < filtered[j].Name
+
+		aName := strings.ToLower(a.Name)
+		bName := strings.ToLower(b.Name)
+		if aName != bName {
+			return aName < bName
+		}
+
+		return a.MAC < b.MAC
 	})
 	return filtered, nil
 }
@@ -228,6 +271,32 @@ func matchesQuery(item model.DeviceView, query string) bool {
 }
 
 func normalizeMAC(mac string) string {
-	mac = strings.TrimSpace(strings.ToUpper(strings.ReplaceAll(mac, "-", ":")))
+	mac = strings.TrimSpace(mac)
+	if decoded, err := url.PathUnescape(mac); err == nil {
+		mac = decoded
+	}
+	mac = strings.ReplaceAll(mac, " ", "")
+	mac = strings.ToUpper(strings.ReplaceAll(mac, "-", ":"))
 	return mac
+}
+
+func statusRank(status string) int {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "new":
+		return 0
+	case "registered":
+		return 1
+	default:
+		return 2
+	}
+}
+
+func primarySortTime(item model.DeviceView) time.Time {
+	if item.Status == "registered" && item.CreatedAt != nil {
+		return item.CreatedAt.UTC()
+	}
+	if item.Status == "new" && item.FirstSeenAt != nil {
+		return item.FirstSeenAt.UTC()
+	}
+	return item.UpdatedAt.UTC()
 }

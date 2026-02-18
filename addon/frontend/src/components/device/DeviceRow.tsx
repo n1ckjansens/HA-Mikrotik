@@ -10,7 +10,7 @@ type Props = {
   device: Device;
   busy: boolean;
   onOpenDetails: (mac: string) => void;
-  onRegister: (mac: string) => void;
+  onRegister: (device: Device) => void;
 };
 
 function formatLastSeen(value?: string | null) {
@@ -27,7 +27,11 @@ export function DeviceRow({ device, busy, onOpenDetails, onRegister }: Props) {
         <div className="flex items-start gap-3">
           <Wifi className="mt-1 h-4 w-4" />
           <div className="space-y-1">
-            <p className="text-sm font-semibold">{device.name}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold">{device.name}</p>
+              <DeviceStatusBadge status={device.status} />
+              <DeviceOnlineBadge online={device.online} />
+            </div>
             <p className="font-mono text-xs text-muted-foreground">{device.mac}</p>
             <p className="text-xs text-muted-foreground">{device.vendor}</p>
             <p className="text-xs text-muted-foreground">
@@ -36,15 +40,8 @@ export function DeviceRow({ device, busy, onOpenDetails, onRegister }: Props) {
             <p className="text-xs text-muted-foreground">Last seen: {formatLastSeen(device.last_seen_at)}</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <DeviceStatusBadge status={device.status} />
-          <DeviceOnlineBadge online={device.online} />
-          <DeviceActions
-            device={device}
-            busy={busy}
-            onOpenDetails={onOpenDetails}
-            onRegister={onRegister}
-          />
+        <div className="flex items-center">
+          <DeviceActions device={device} busy={busy} onOpenDetails={onOpenDetails} onRegister={onRegister} />
         </div>
       </CardContent>
     </Card>

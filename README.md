@@ -16,7 +16,7 @@ No duplicate manual configuration is required in the add-on.
 
 - `custom_components/mikrotik_presence/` - integration with config flow and internal API endpoint.
 - `addon/` - Go backend, SQLite persistence, RouterOS poller, ingress server.
-- `frontend/` - React/Vite/TypeScript UI with shadcn/ui.
+- `addon/frontend/` - React/Vite/TypeScript UI with shadcn/ui.
 
 ## Features
 
@@ -30,6 +30,11 @@ No duplicate manual configuration is required in the add-on.
 
 ## Development
 
+Full local development (Docker Compose, mock/real RouterOS, smoke tests, hot reload):
+
+- `docs/development.md`
+- `docs/router-setup.md` (подготовка RouterOS v7 под интеграцию)
+
 ### Backend checks
 
 ```bash
@@ -40,21 +45,12 @@ go test ./... -race
 ### Frontend checks
 
 ```bash
-cd frontend
+cd addon/frontend
 npm install
 npm run lint
 npm run typecheck
 npm run build
 ```
-
-### Sync frontend bundle into add-on image context
-
-```bash
-cd addon
-./sync_frontend.sh
-```
-
-This syncs `frontend/` source into `addon/frontend/` so the add-on Docker image can build the ingress UI.
 
 ## API
 

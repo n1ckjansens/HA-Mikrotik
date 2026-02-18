@@ -1,0 +1,22 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/mikrotik-presence ./cmd/server"
+bin = "./tmp/mikrotik-presence"
+full_bin = "HTTP_ADDR=:8099 DB_PATH=/data/mikrotik_presence.db FRONTEND_DIST=/workspace/addon/web ./tmp/mikrotik-presence"
+include_ext = ["go", "json", "yaml", "yml"]
+exclude_dir = ["tmp", "web", "frontend", "migrations"]
+exclude_file = []
+exclude_regex = ["_test.go"]
+delay = 300
+stop_on_error = true
+
+[log]
+time = true
+
+[color]
+main = "yellow"
+watcher = "cyan"
+build = "green"
+runner = "magenta"

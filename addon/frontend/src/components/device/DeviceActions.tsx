@@ -5,7 +5,7 @@ type Props = {
   device: Device;
   busy: boolean;
   onOpenDetails: (mac: string) => void;
-  onRegister: (mac: string) => void;
+  onRegister: (device: Device) => void;
 };
 
 export function DeviceActions({ device, busy, onOpenDetails, onRegister }: Props) {
@@ -15,7 +15,7 @@ export function DeviceActions({ device, busy, onOpenDetails, onRegister }: Props
         Details
       </Button>
       {device.status === "new" ? (
-        <Button size="sm" disabled={busy} onClick={() => onRegister(device.mac)}>
+        <Button size="sm" disabled={busy} onClick={() => onRegister(device)}>
           Register
         </Button>
       ) : null}

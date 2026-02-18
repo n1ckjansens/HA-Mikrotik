@@ -5,6 +5,20 @@ import path from "node:path";
 export default defineConfig({
   base: "./",
   plugins: [react()],
+  server: {
+    host: "0.0.0.0",
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost:8099",
+        changeOrigin: true
+      },
+      "/healthz": {
+        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost:8099",
+        changeOrigin: true
+      }
+    }
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src")

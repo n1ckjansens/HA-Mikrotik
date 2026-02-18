@@ -1,8 +1,11 @@
 .DS_Store
+.env.dev
+__pycache__/
+*.pyc
+*.tsbuildinfo
 node_modules
-frontend/dist
 addon/frontend/dist
 addon/frontend/node_modules
 addon/web/assets
 addon/web/.vite
-addon/go.sum
+addon/tmp

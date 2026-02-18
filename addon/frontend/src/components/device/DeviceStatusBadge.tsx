@@ -6,8 +6,8 @@ type Props = {
 };
 
 export function DeviceStatusBadge({ status }: Props) {
-  if (status === "registered") {
-    return <Badge variant="default">Registered</Badge>;
+  if (status !== "new") {
+    return null;
   }
   return <Badge variant="secondary">New</Badge>;
 }

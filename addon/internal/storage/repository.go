@@ -118,6 +118,28 @@ func (r *Repository) UpsertNewCache(ctx context.Context, rows []model.DeviceNewC
 	return tx.Commit()
 }
 
+func (r *Repository) DeleteStates(ctx context.Context, macs []string) error {
+	return r.deleteByMACs(ctx, "devices_state", macs)
+}
+
+func (r *Repository) DeleteNewCache(ctx context.Context, macs []string) error {
+	return r.deleteByMACs(ctx, "devices_new_cache", macs)
+}
+
+func (r *Repository) deleteByMACs(ctx context.Context, table string, macs []string) error {
+	if len(macs) == 0 {
+		return nil
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(macs)), ",")
+	args := make([]any, 0, len(macs))
+	for _, mac := range macs {
+		args = append(args, mac)
+	}
+	query := fmt.Sprintf("DELETE FROM %s WHERE mac IN (%s)", table, placeholders)
+	_, err := r.db.ExecContext(ctx, query, args...)
+	return err
+}
+
 func (r *Repository) ListRegistered(ctx context.Context) (map[string]model.DeviceRegistered, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT mac, name, icon, comment, created_at, updated_at FROM devices_registered`)
 	if err != nil {
@@ -312,7 +334,11 @@ func MergeDeviceViews(
 			online = state.Online
 		}
 
-		firstSeen := cache.FirstSeenAt
+		var firstSeenAt *time.Time
+		if !cache.FirstSeenAt.IsZero() {
+			firstSeen := cache.FirstSeenAt
+			firstSeenAt = &firstSeen
+		}
 		view := model.DeviceView{
 			MAC:              mac,
 			Name:             name,
@@ -328,7 +354,7 @@ func MergeDeviceViews(
 			LastSources:      sources,
 			CreatedAt:        createdAt,
 			UpdatedAt:        updated,
-			FirstSeenAt:      &firstSeen,
+			FirstSeenAt:      firstSeenAt,
 		}
 		result = append(result, view)
 	}
