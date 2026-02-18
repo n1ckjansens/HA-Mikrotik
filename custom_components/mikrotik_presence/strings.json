@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MikroTik Presence",
+        "description": "Configure RouterOS connection",
+        "data": {
+          "host": "Router host",
+          "username": "Username",
+          "password": "Password",
+          "ssl": "Use HTTPS",
+          "verify_tls": "Verify TLS certificate",
+          "poll_interval_sec": "Poll interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to RouterOS"
+    },
+    "abort": {
+      "single_instance_allowed": "Only one MikroTik Presence instance is supported"
+    }
+  }
+}

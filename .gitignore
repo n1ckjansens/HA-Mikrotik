@@ -1,0 +1,8 @@
+.DS_Store
+node_modules
+frontend/dist
+addon/frontend/dist
+addon/frontend/node_modules
+addon/web/assets
+addon/web/.vite
+addon/go.sum
