@@ -1,6 +1,6 @@
 {
   "name": "MikroTik Presence",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "slug": "mikrotik_presence",
   "description": "MikroTik RouterOS v7 device presence monitor",
   "url": "https://github.com/example/mikrotik-presence",
