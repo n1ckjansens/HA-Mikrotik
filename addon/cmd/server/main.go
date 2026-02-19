@@ -8,12 +8,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/micro-ha/mikrotik-presence/addon/internal/aggregator"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/configsync"
 	httpapi "github.com/micro-ha/mikrotik-presence/addon/internal/http"
+	"github.com/micro-ha/mikrotik-presence/addon/internal/model"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/oui"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/poller"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/routeros"
@@ -48,7 +50,21 @@ func main() {
 	}
 
 	routerClient := routeros.NewClient()
-	agg := aggregator.New(subnet.New(), ouiDB)
+	thresholds := model.PresenceThresholds{
+		WiFiIdleThreshold: parseDurationEnv("WIFI_IDLE_THRESHOLD", 5*time.Minute, logger),
+		DHCPRecentThreshold: parseDurationEnv(
+			"DHCP_RECENT_THRESHOLD",
+			30*time.Minute,
+			logger,
+		),
+		OfflineHardThreshold: parseDurationEnv(
+			"OFFLINE_HARD_THRESHOLD",
+			24*time.Hour,
+			logger,
+		),
+	}.Normalize()
+
+	agg := aggregator.NewWithThresholds(subnet.New(), ouiDB, thresholds)
 
 	haBaseURL := env("HA_BASE_URL", "http://supervisor/core")
 	supervisorToken := os.Getenv("SUPERVISOR_TOKEN")
@@ -59,7 +75,7 @@ func main() {
 		logger.Warn("initial config refresh failed", "err", err)
 	}
 
-	svc := service.New(repo, agg, routerClient, cfgManager, logger)
+	svc := service.NewWithThresholds(repo, agg, routerClient, cfgManager, logger, thresholds)
 	devicePoller := poller.New(svc, cfgManager, logger)
 
 	go runConfigFallbackRefresh(ctx, cfgManager, devicePoller, logger)
@@ -137,4 +153,17 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func parseDurationEnv(key string, fallback time.Duration, logger *slog.Logger) time.Duration {
+	raw, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return fallback
+	}
+	value, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err != nil {
+		logger.Warn("invalid duration env; using fallback", "key", key, "value", raw, "fallback", fallback.String())
+		return fallback
+	}
+	return value
 }

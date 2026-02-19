@@ -22,7 +22,7 @@ func TestAggregatePriorityAndOnline(t *testing.T) {
 			{MAC: "AA:BB:CC:DD:EE:FF", Address: "192.168.88.10", HostName: "phone", Status: "bound", LastSeen: "5s"},
 		},
 		WiFi: []routeros.WiFiRegistration{
-			{MAC: "AA:BB:CC:DD:EE:FF", Interface: "wifi1", LastActivity: "2m"},
+			{MAC: "AA:BB:CC:DD:EE:FF", Interface: "wifi1", LastActivity: "30s"},
 		},
 		ARP: []routeros.ARPEntry{
 			{MAC: "11:22:33:44:55:66", Address: "192.168.88.20", Interface: "bridge"},
@@ -43,22 +43,57 @@ func TestAggregatePriorityAndOnline(t *testing.T) {
 	if first.LastSeenAt == nil {
 		t.Fatalf("expected last seen")
 	}
-	if first.LastSeenAt.Before(now.Add(-10*time.Second)) || first.LastSeenAt.After(now) {
-		t.Fatalf("expected DHCP last_seen priority near now-5s, got %v", first.LastSeenAt)
+	if first.LastSeenAt.Before(now.Add(-time.Minute)) || first.LastSeenAt.After(now) {
+		t.Fatalf("expected wifi/dhcp last_seen near now, got %v", first.LastSeenAt)
 	}
 	if first.LastSubnet != "192.168.88.1/24" {
 		t.Fatalf("expected subnet match, got %s", first.LastSubnet)
+	}
+	if first.ConnectionStatus != "ONLINE" {
+		t.Fatalf("expected connection status ONLINE, got %s", first.ConnectionStatus)
 	}
 
 	second, ok := items["11:22:33:44:55:66"]
 	if !ok {
 		t.Fatalf("expected arp device")
 	}
-	if !second.Online {
-		t.Fatalf("expected arp device online")
+	if second.Online {
+		t.Fatalf("expected arp-only incomplete device offline")
+	}
+	if second.ConnectionStatus != "IDLE_RECENT" {
+		t.Fatalf("expected arp-only incomplete device idle_recent, got %s", second.ConnectionStatus)
 	}
 	if second.Vendor != "VendorY" {
 		t.Fatalf("expected vendor from oui, got %s", second.Vendor)
+	}
+}
+
+func TestAggregateDHCPIdleRecent(t *testing.T) {
+	now := time.Date(2026, 2, 18, 12, 0, 0, 0, time.UTC)
+	agg := New(subnet.New(), fakeOUI{})
+
+	snap := &routeros.Snapshot{
+		FetchedAt: now,
+		DHCP: []routeros.DHCPLease{
+			{
+				MAC:      "AA:BB:CC:DD:EE:01",
+				Address:  "192.168.88.30",
+				Status:   "bound",
+				LastSeen: "2h",
+			},
+		},
+	}
+
+	items := agg.Aggregate(snap)
+	item, ok := items["AA:BB:CC:DD:EE:01"]
+	if !ok {
+		t.Fatalf("expected device")
+	}
+	if item.Online {
+		t.Fatalf("expected stale dhcp device offline")
+	}
+	if item.ConnectionStatus != "IDLE_RECENT" {
+		t.Fatalf("expected IDLE_RECENT, got %s", item.ConnectionStatus)
 	}
 }
 

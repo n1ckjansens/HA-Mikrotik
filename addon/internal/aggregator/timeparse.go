@@ -23,6 +23,26 @@ func parseRouterOSTimestamp(value string, now time.Time) *time.Time {
 	return nil
 }
 
+func parseRouterOSAge(value string, now time.Time) *time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	if ts, err := time.Parse(time.RFC3339, value); err == nil {
+		delta := now.UTC().Sub(ts.UTC())
+		if delta < 0 {
+			delta = -delta
+		}
+		v := delta
+		return &v
+	}
+	if d, err := parseRouterOSDuration(value); err == nil {
+		v := d
+		return &v
+	}
+	return nil
+}
+
 func parseRouterOSDuration(value string) (time.Duration, error) {
 	if strings.Contains(value, ":") {
 		parts := strings.Split(value, ":")

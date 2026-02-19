@@ -7,7 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +21,15 @@ const (
 	defaultTimeout   = 10 * time.Second
 	maxRetryAttempts = 3
 )
+
+type HTTPStatusError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *HTTPStatusError) Error() string {
+	return fmt.Sprintf("status %d: %s", e.StatusCode, e.Body)
+}
 
 type Client struct {
 	httpClient *http.Client
@@ -56,7 +68,7 @@ func (c *Client) FetchSnapshot(ctx context.Context, cfg model.RouterConfig) (*Sn
 	snapshot := &Snapshot{FetchedAt: time.Now().UTC()}
 
 	var err error
-	if snapshot.DHCP, err = fetchDHCP(ctx, &client, base, cfg); err != nil {
+	if snapshot.DHCP, base, err = fetchDHCP(ctx, &client, base, cfg); err != nil {
 		return nil, err
 	}
 	if snapshot.WiFi, err = fetchWiFi(ctx, &client, base, cfg); err != nil {
@@ -74,10 +86,15 @@ func (c *Client) FetchSnapshot(ctx context.Context, cfg model.RouterConfig) (*Sn
 	return snapshot, nil
 }
 
-func fetchDHCP(ctx context.Context, client *http.Client, base string, cfg model.RouterConfig) ([]DHCPLease, error) {
-	rows, err := fetchRows(ctx, client, base+"/ip/dhcp-server/lease", cfg)
+func fetchDHCP(
+	ctx context.Context,
+	client *http.Client,
+	base string,
+	cfg model.RouterConfig,
+) ([]DHCPLease, string, error) {
+	rows, nextBase, err := fetchRowsWithHTTPSFallback(ctx, client, base, "/ip/dhcp-server/lease", cfg)
 	if err != nil {
-		return nil, err
+		return nil, base, err
 	}
 	items := make([]DHCPLease, 0, len(rows))
 	for _, row := range rows {
@@ -89,30 +106,53 @@ func fetchDHCP(ctx context.Context, client *http.Client, base string, cfg model.
 			MAC:      mac,
 			Address:  str(row["address"]),
 			HostName: str(row["host-name"]),
+			Server:   str(row["server"]),
 			Status:   str(row["status"]),
 			LastSeen: str(row["last-seen"]),
+			Dynamic:  boolValue(row["dynamic"]),
+			Blocked:  boolValue(row["blocked"]),
+			Disabled: boolValue(row["disabled"]),
 		})
 	}
-	return items, nil
+	return items, nextBase, nil
 }
 
 func fetchWiFi(ctx context.Context, client *http.Client, base string, cfg model.RouterConfig) ([]WiFiRegistration, error) {
-	rows, err := fetchRows(ctx, client, base+"/interface/wifi/registration-table", cfg)
-	if err != nil {
-		return nil, err
+	paths := []struct {
+		endpoint string
+		driver   string
+	}{
+		{endpoint: "/interface/wifi/registration-table", driver: "wifi"},
+		{endpoint: "/interface/wifiwave2/registration-table", driver: "wifiwave2"},
+		{endpoint: "/interface/wireless/registration-table", driver: "wireless"},
 	}
-	items := make([]WiFiRegistration, 0, len(rows))
-	for _, row := range rows {
-		mac := canonicalMAC(str(row["mac-address"]))
-		if mac == "" {
-			continue
+
+	items := make([]WiFiRegistration, 0)
+	for _, path := range paths {
+		rows, err := fetchRows(ctx, client, base+path.endpoint, cfg)
+		if err != nil {
+			if isMissingEndpointError(err) {
+				continue
+			}
+			return nil, err
 		}
-		items = append(items, WiFiRegistration{
-			MAC:          mac,
-			Interface:    str(row["interface"]),
-			Uptime:       str(row["uptime"]),
-			LastActivity: str(row["last-activity"]),
-		})
+		for _, row := range rows {
+			mac := canonicalMAC(str(row["mac-address"]))
+			if mac == "" {
+				continue
+			}
+			items = append(items, WiFiRegistration{
+				MAC:          mac,
+				Interface:    str(row["interface"]),
+				SSID:         str(row["ssid"]),
+				Uptime:       str(row["uptime"]),
+				LastActivity: str(row["last-activity"]),
+				Signal:       firstNonEmpty(str(row["signal"]), str(row["tx-signal"])),
+				AuthType:     firstNonEmpty(str(row["auth-type"]), str(row["authentication-types"])),
+				Band:         str(row["band"]),
+				Driver:       path.driver,
+			})
+		}
 	}
 	return items, nil
 }
@@ -128,7 +168,12 @@ func fetchBridge(ctx context.Context, client *http.Client, base string, cfg mode
 		if mac == "" {
 			continue
 		}
-		items = append(items, BridgeHost{MAC: mac, Interface: str(row["on-interface"])})
+		items = append(items, BridgeHost{
+			MAC:       mac,
+			Bridge:    str(row["bridge"]),
+			Interface: firstNonEmpty(str(row["interface"]), str(row["on-interface"])),
+			VID:       str(row["vid"]),
+		})
 	}
 	return items, nil
 }
@@ -144,7 +189,12 @@ func fetchARP(ctx context.Context, client *http.Client, base string, cfg model.R
 		if mac == "" {
 			continue
 		}
-		items = append(items, ARPEntry{MAC: mac, Address: str(row["address"]), Interface: str(row["interface"])})
+		items = append(items, ARPEntry{
+			MAC:       mac,
+			Address:   str(row["address"]),
+			Interface: str(row["interface"]),
+			Flags:     str(row["flags"]),
+		})
 	}
 	return items, nil
 }
@@ -172,6 +222,9 @@ func fetchRows(ctx context.Context, client *http.Client, endpoint string, cfg mo
 		if err == nil {
 			return rows, nil
 		}
+		if isMissingEndpointError(err) {
+			return nil, err
+		}
 		lastErr = err
 		select {
 		case <-ctx.Done():
@@ -180,6 +233,30 @@ func fetchRows(ctx context.Context, client *http.Client, endpoint string, cfg mo
 		}
 	}
 	return nil, fmt.Errorf("routeros request failed for %s: %w", endpoint, lastErr)
+}
+
+func fetchRowsWithHTTPSFallback(
+	ctx context.Context,
+	client *http.Client,
+	base string,
+	path string,
+	cfg model.RouterConfig,
+) ([]map[string]any, string, error) {
+	endpoint := base + path
+	rows, err := fetchRows(ctx, client, endpoint, cfg)
+	if err == nil {
+		return rows, base, nil
+	}
+	if !shouldFallbackToHTTP(cfg, endpoint, err) {
+		return nil, base, err
+	}
+
+	fallbackBase := downgradeBaseToHTTP(base)
+	fallbackRows, fallbackErr := fetchRows(ctx, client, fallbackBase+path, cfg)
+	if fallbackErr != nil {
+		return nil, base, fmt.Errorf("%w; http fallback failed: %v", err, fallbackErr)
+	}
+	return fallbackRows, fallbackBase, nil
 }
 
 func doFetchRows(ctx context.Context, client *http.Client, endpoint string, cfg model.RouterConfig) ([]map[string]any, error) {
@@ -198,7 +275,7 @@ func doFetchRows(ctx context.Context, client *http.Client, endpoint string, cfg 
 
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
-		return nil, fmt.Errorf("status %d: %s", resp.StatusCode, string(body))
+		return nil, &HTTPStatusError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 
 	var rows []map[string]any
@@ -231,4 +308,71 @@ func canonicalMAC(v string) string {
 		return ""
 	}
 	return strings.ReplaceAll(v, "-", ":")
+}
+
+func isMissingEndpointError(err error) bool {
+	var statusErr *HTTPStatusError
+	if !errors.As(err, &statusErr) {
+		return false
+	}
+	return statusErr.StatusCode == http.StatusNotFound || statusErr.StatusCode == http.StatusBadRequest
+}
+
+func shouldFallbackToHTTP(cfg model.RouterConfig, endpoint string, err error) bool {
+	if !cfg.SSL || !strings.HasPrefix(endpoint, "https://") {
+		return false
+	}
+	if isMissingEndpointError(err) {
+		return false
+	}
+	return isLikelyHTTPSServiceMismatch(err)
+}
+
+func isLikelyHTTPSServiceMismatch(err error) bool {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && urlErr.Err != nil {
+		err = urlErr.Err
+	}
+
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		lower := strings.ToLower(opErr.Err.Error())
+		if strings.Contains(lower, "refused") {
+			return true
+		}
+	}
+
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "eof") ||
+		strings.Contains(lower, "tls:") ||
+		strings.Contains(lower, "https client") ||
+		strings.Contains(lower, "first record does not look like a tls handshake")
+}
+
+func downgradeBaseToHTTP(base string) string {
+	if strings.HasPrefix(base, "https://") {
+		return "http://" + strings.TrimPrefix(base, "https://")
+	}
+	return base
+}
+
+func boolValue(v any) bool {
+	switch typed := v.(type) {
+	case bool:
+		return typed
+	case string:
+		parsed, err := strconv.ParseBool(strings.TrimSpace(typed))
+		return err == nil && parsed
+	default:
+		return false
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }

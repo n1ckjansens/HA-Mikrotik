@@ -6,6 +6,7 @@ export function useDevices(filters: DevicesFilterParams) {
   return useQuery({
     queryKey: ["devices", filters],
     queryFn: () => fetchDevices(filters),
+    staleTime: 3000,
     refetchInterval: 5000
   });
 }

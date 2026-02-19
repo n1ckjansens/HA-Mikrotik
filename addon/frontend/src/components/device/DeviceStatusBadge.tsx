@@ -1,13 +1,25 @@
 import { Badge } from "@/components/ui/badge";
-import type { DeviceStatus } from "@/types/device";
 
 type Props = {
-  status: DeviceStatus;
+  online: boolean;
 };
 
-export function DeviceStatusBadge({ status }: Props) {
-  if (status !== "new") {
-    return null;
+export function DeviceStatusBadge({ online }: Props) {
+  if (online) {
+    return (
+      <Badge
+        variant="outline"
+        className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+        aria-label="Device online"
+      >
+        Online
+      </Badge>
+    );
   }
-  return <Badge variant="secondary">New</Badge>;
+
+  return (
+    <Badge variant="outline" className="text-muted-foreground" aria-label="Device offline">
+      Offline
+    </Badge>
+  );
 }

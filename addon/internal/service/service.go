@@ -27,11 +27,30 @@ type Service struct {
 	aggregator *aggregator.Aggregator
 	routeros   RouterClient
 	config     *configsync.Manager
+	thresholds model.PresenceThresholds
 	logger     *slog.Logger
 }
 
 func New(repo *storage.Repository, agg *aggregator.Aggregator, client RouterClient, cfg *configsync.Manager, logger *slog.Logger) *Service {
-	return &Service{repo: repo, aggregator: agg, routeros: client, config: cfg, logger: logger}
+	return NewWithThresholds(repo, agg, client, cfg, logger, model.DefaultPresenceThresholds())
+}
+
+func NewWithThresholds(
+	repo *storage.Repository,
+	agg *aggregator.Aggregator,
+	client RouterClient,
+	cfg *configsync.Manager,
+	logger *slog.Logger,
+	thresholds model.PresenceThresholds,
+) *Service {
+	return &Service{
+		repo:       repo,
+		aggregator: agg,
+		routeros:   client,
+		config:     cfg,
+		thresholds: thresholds.Normalize(),
+		logger:     logger,
+	}
 }
 
 type ListFilter struct {
@@ -89,19 +108,29 @@ func (s *Service) persistSnapshot(ctx context.Context, observed map[string]model
 		obs, hasObs := observed[mac]
 		_, isRegistered := registered[mac]
 
-		if !isRegistered && (!hasObs || !obs.Online) {
+		if !isRegistered && (!hasObs || obs.ConnectionStatus != model.ConnectionStatusOnline) {
 			deleteMACs = append(deleteMACs, mac)
 			continue
 		}
 
-		next := model.DeviceState{MAC: mac, UpdatedAt: now}
+		next := model.DeviceState{
+			MAC:              mac,
+			UpdatedAt:        now,
+			LastSourcesJSON:  "[]",
+			ConnectionStatus: string(model.ConnectionStatusUnknown),
+			StatusReason:     "no_signal",
+		}
 		if hadPrev {
 			next = prev
 			next.UpdatedAt = now
 		}
 
 		if hasObs {
-			next.Online = obs.Online
+			applyObservationToState(&next, obs)
+
+			next.Online = obs.ConnectionStatus == model.ConnectionStatusOnline
+			next.ConnectionStatus = string(obs.ConnectionStatus)
+			next.StatusReason = obs.StatusReason
 			if obs.LastSeenAt != nil {
 				next.LastSeenAt = obs.LastSeenAt
 			}
@@ -114,12 +143,9 @@ func (s *Service) persistSnapshot(ctx context.Context, observed map[string]model
 				next.LastSubnet = &subnet
 			}
 			next.LastSourcesJSON = storage.EncodeSourcesJSON(obs.Sources)
-			if obs.Online && (!hadPrev || !prev.Online) {
+			if next.Online && (!hadPrev || !prev.Online) {
 				started := now
 				next.ConnectedSinceAt = &started
-			}
-			if !obs.Online {
-				next.LastSourcesJSON = "[]"
 			}
 
 			cache, hasCache := newCache[mac]
@@ -143,6 +169,9 @@ func (s *Service) persistSnapshot(ctx context.Context, observed map[string]model
 		} else {
 			next.Online = false
 			next.LastSourcesJSON = "[]"
+			status, reason := deriveStatusWithoutObservation(now, next, s.thresholds)
+			next.ConnectionStatus = string(status)
+			next.StatusReason = reason
 		}
 		states = append(states, next)
 	}

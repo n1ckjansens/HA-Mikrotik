@@ -1,49 +1,64 @@
-import { Wifi } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
-import { DeviceActions } from "@/components/device/DeviceActions";
-import { DeviceOnlineBadge } from "@/components/device/DeviceOnlineBadge";
+import { DeviceLastSeen } from "@/components/device/DeviceLastSeen";
+import { DeviceMeta } from "@/components/device/DeviceMeta";
 import { DeviceStatusBadge } from "@/components/device/DeviceStatusBadge";
+import { DeviceTypeIcon } from "@/components/device/DeviceTypeIcon";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { inferDeviceType } from "@/lib/device";
+import { cn } from "@/lib/utils";
 import type { Device } from "@/types/device";
 
 type Props = {
   device: Device;
-  busy: boolean;
-  onOpenDetails: (mac: string) => void;
-  onRegister: (device: Device) => void;
+  now: number;
+  onOpen: (mac: string) => void;
 };
 
-function formatLastSeen(value?: string | null) {
-  if (!value) {
-    return "never";
-  }
-  return new Date(value).toLocaleString();
-}
-
-export function DeviceRow({ device, busy, onOpenDetails, onRegister }: Props) {
+export function DeviceRow({ device, now, onOpen }: Props) {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 pt-6 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-start gap-3">
-          <Wifi className="mt-1 h-4 w-4" />
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold">{device.name}</p>
-              <DeviceStatusBadge status={device.status} />
-              <DeviceOnlineBadge online={device.online} />
+    <Card
+      className={cn(
+        "transition-colors hover:border-primary/60",
+        "focus-within:border-primary/70",
+        device.status === "new" && "border-l-4 border-l-blue-500",
+        !device.online && "opacity-90"
+      )}
+    >
+      <button
+        type="button"
+        className="w-full cursor-pointer text-left"
+        onClick={() => onOpen(device.mac)}
+        aria-label={`Open details for ${device.name}`}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <DeviceTypeIcon type={inferDeviceType(device)} />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="truncate text-sm font-semibold">{device.name}</p>
+                  {device.status === "new" ? (
+                    <Badge
+                      variant="outline"
+                      className="border-blue-500/60 text-blue-700"
+                      aria-label="New device"
+                    >
+                      NEW
+                    </Badge>
+                  ) : null}
+                </div>
+                <DeviceStatusBadge online={device.online} />
+              </div>
+
+              <DeviceMeta device={device} />
+              <DeviceLastSeen online={device.online} lastSeenAt={device.last_seen_at} now={now} />
             </div>
-            <p className="font-mono text-xs text-muted-foreground">{device.mac}</p>
-            <p className="text-xs text-muted-foreground">{device.vendor}</p>
-            <p className="text-xs text-muted-foreground">
-              {device.last_ip ?? "-"} {device.last_subnet ? `(${device.last_subnet})` : ""}
-            </p>
-            <p className="text-xs text-muted-foreground">Last seen: {formatLastSeen(device.last_seen_at)}</p>
+            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
           </div>
-        </div>
-        <div className="flex items-center">
-          <DeviceActions device={device} busy={busy} onOpenDetails={onOpenDetails} onRegister={onRegister} />
-        </div>
-      </CardContent>
+        </CardContent>
+      </button>
     </Card>
   );
 }

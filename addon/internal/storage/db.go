@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -57,6 +58,26 @@ func (r *Repository) migrate(ctx context.Context) error {
 			connected_since_at TEXT,
 			last_ip TEXT,
 			last_subnet TEXT,
+			host_name TEXT,
+			interface TEXT,
+			bridge TEXT,
+			ssid TEXT,
+			dhcp_server TEXT,
+			dhcp_status TEXT,
+			dhcp_last_seen_sec INTEGER,
+			wifi_driver TEXT,
+			wifi_interface TEXT,
+			wifi_last_activity_sec INTEGER,
+			wifi_uptime_sec INTEGER,
+			wifi_auth_type TEXT,
+			wifi_signal INTEGER,
+			arp_ip TEXT,
+			arp_interface TEXT,
+			arp_is_complete INTEGER NOT NULL DEFAULT 0,
+			bridge_host_port TEXT,
+			bridge_host_vlan INTEGER,
+			connection_status TEXT NOT NULL DEFAULT 'UNKNOWN',
+			status_reason TEXT NOT NULL DEFAULT '',
 			last_sources_json TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);`,
@@ -76,7 +97,49 @@ func (r *Repository) migrate(ctx context.Context) error {
 	if _, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_devices_state_online ON devices_state(online);`); err != nil {
 		return err
 	}
+	if err := r.ensureStateColumns(ctx); err != nil {
+		return err
+	}
 	return r.normalizeLegacyMACKeys(ctx)
+}
+
+func (r *Repository) ensureStateColumns(ctx context.Context) error {
+	columns := []string{
+		`ALTER TABLE devices_state ADD COLUMN host_name TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN interface TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN bridge TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN ssid TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN dhcp_server TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN dhcp_status TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN dhcp_last_seen_sec INTEGER`,
+		`ALTER TABLE devices_state ADD COLUMN wifi_driver TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN wifi_interface TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN wifi_last_activity_sec INTEGER`,
+		`ALTER TABLE devices_state ADD COLUMN wifi_uptime_sec INTEGER`,
+		`ALTER TABLE devices_state ADD COLUMN wifi_auth_type TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN wifi_signal INTEGER`,
+		`ALTER TABLE devices_state ADD COLUMN arp_ip TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN arp_interface TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN arp_is_complete INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE devices_state ADD COLUMN bridge_host_port TEXT`,
+		`ALTER TABLE devices_state ADD COLUMN bridge_host_vlan INTEGER`,
+		`ALTER TABLE devices_state ADD COLUMN connection_status TEXT NOT NULL DEFAULT 'UNKNOWN'`,
+		`ALTER TABLE devices_state ADD COLUMN status_reason TEXT NOT NULL DEFAULT ''`,
+	}
+
+	for _, stmt := range columns {
+		if _, err := r.db.ExecContext(ctx, stmt); err != nil && !isDuplicateColumnError(err) {
+			return fmt.Errorf("state schema update failed: %w", err)
+		}
+	}
+	return nil
+}
+
+func isDuplicateColumnError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "duplicate column name")
 }
 
 func (r *Repository) normalizeLegacyMACKeys(ctx context.Context) error {
@@ -136,4 +199,34 @@ func strPtr(v sql.NullString) *string {
 	}
 	s := v.String
 	return &s
+}
+
+func int64Ptr(v sql.NullInt64) *int64 {
+	if !v.Valid {
+		return nil
+	}
+	value := v.Int64
+	return &value
+}
+
+func intPtr(v sql.NullInt64) *int {
+	if !v.Valid {
+		return nil
+	}
+	value := int(v.Int64)
+	return &value
+}
+
+func fromInt64Ptr(v *int64) any {
+	if v == nil {
+		return nil
+	}
+	return *v
+}
+
+func fromIntPtr(v *int) any {
+	if v == nil {
+		return nil
+	}
+	return *v
 }

@@ -6,26 +6,38 @@ type DHCPLease struct {
 	MAC      string
 	Address  string
 	HostName string
+	Server   string
 	Status   string
 	LastSeen string
+	Dynamic  bool
+	Blocked  bool
+	Disabled bool
 }
 
 type WiFiRegistration struct {
 	MAC          string
 	Interface    string
+	SSID         string
 	Uptime       string
 	LastActivity string
+	Signal       string
+	AuthType     string
+	Band         string
+	Driver       string
 }
 
 type BridgeHost struct {
 	MAC       string
+	Bridge    string
 	Interface string
+	VID       string
 }
 
 type ARPEntry struct {
 	MAC       string
 	Address   string
 	Interface string
+	Flags     string
 }
 
 type IPAddress struct {
