@@ -1,7 +1,7 @@
 .PHONY: dev-env dev-up dev-up-d dev-down dev-logs dev-smoke mock-online mock-offline go-test ui-test
 
 dev-env:
-	@test -f .env.dev || cp .env.dev.example .env.dev
+	@test -f .env.dev || cp env.dev.example .env.dev
 
 dev-up: dev-env
 	docker compose -f docker-compose.dev.yml up --build

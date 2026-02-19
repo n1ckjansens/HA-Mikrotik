@@ -1,5 +1,26 @@
 .DS_Store
-.env.dev
+
+# Local env files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Sensitive credentials and certs
+*.pem
+*.key
+*.p12
+*.crt
+*.jks
+*.ovpn
+*.tfvars
+*.tfvars.json
+secrets.yml
+secrets.yaml
+secrets.json
+.npmrc
+.pypirc
+
 __pycache__/
 *.pyc
 *.tsbuildinfo

@@ -15,7 +15,7 @@ This guide explains how to run MikroTik Presence locally without Home Assistant,
 1. Prepare env file:
 
 ```bash
-cp .env.dev.example .env.dev
+cp env.dev.example .env.dev
 ```
 
 2. Start full dev stack (backend + frontend + mock HA + mock RouterOS):
