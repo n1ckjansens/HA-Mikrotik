@@ -30,8 +30,8 @@ type RouterConfigProvider interface {
 
 // RouterClient groups action/state-source dependencies.
 type RouterClient interface {
-	automationdomain.AddressListClient
-	automationdomain.AddressListStateClient
+	automationdomain.RouterActionClient
+	automationdomain.RouterStateClient
 }
 
 // Engine implements automation.AutomationEngine.

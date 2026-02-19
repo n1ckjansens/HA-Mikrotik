@@ -20,10 +20,22 @@ type AddressListClient interface {
 	RemoveAddressListEntry(ctx context.Context, cfg model.RouterConfig, list, address string) error
 }
 
+// FirewallRuleClient is required by MikroTik firewall rule actions.
+type FirewallRuleClient interface {
+	SetFirewallRuleDisabled(ctx context.Context, cfg model.RouterConfig, table, ruleID string, disabled bool) error
+	SetFirewallRulesDisabledByComment(ctx context.Context, cfg model.RouterConfig, table, comment string, disabled bool) error
+}
+
+// RouterActionClient groups RouterOS operations used by automation actions.
+type RouterActionClient interface {
+	AddressListClient
+	FirewallRuleClient
+}
+
 // ActionExecutionContext contains runtime dependencies for action execution.
 type ActionExecutionContext struct {
 	Target       AutomationTarget
-	RouterClient AddressListClient
+	RouterClient RouterActionClient
 	RouterConfig model.RouterConfig
 	Logger       *slog.Logger
 }

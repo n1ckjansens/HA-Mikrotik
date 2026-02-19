@@ -12,10 +12,22 @@ type AddressListStateClient interface {
 	AddressListContains(ctx context.Context, cfg model.RouterConfig, list, address string) (bool, error)
 }
 
+// FirewallRuleStateClient provides read operations for RouterOS firewall rules.
+type FirewallRuleStateClient interface {
+	GetFirewallRuleEnabled(ctx context.Context, cfg model.RouterConfig, table, ruleID string) (bool, error)
+	GetFirewallRulesEnabledByComment(ctx context.Context, cfg model.RouterConfig, table, comment string) (bool, error)
+}
+
+// RouterStateClient groups RouterOS read operations for state sources.
+type RouterStateClient interface {
+	AddressListStateClient
+	FirewallRuleStateClient
+}
+
 // StateSourceContext contains runtime dependencies for state reads.
 type StateSourceContext struct {
 	Target       AutomationTarget
-	RouterClient AddressListStateClient
+	RouterClient RouterStateClient
 	RouterConfig model.RouterConfig
 	Logger       *slog.Logger
 }

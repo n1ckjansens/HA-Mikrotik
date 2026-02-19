@@ -189,6 +189,7 @@ func (f fakeConfigProvider) Get() (model.RouterConfig, bool) {
 type fakeRouterClient struct {
 	addCalls      int
 	removeCalls   int
+	setRuleCalls  int
 	membershipMap map[string]bool
 }
 
@@ -212,6 +213,28 @@ func (f *fakeRouterClient) RemoveAddressListEntry(
 	return nil
 }
 
+func (f *fakeRouterClient) SetFirewallRuleDisabled(
+	ctx context.Context,
+	cfg model.RouterConfig,
+	table string,
+	ruleID string,
+	disabled bool,
+) error {
+	f.setRuleCalls++
+	return nil
+}
+
+func (f *fakeRouterClient) SetFirewallRulesDisabledByComment(
+	ctx context.Context,
+	cfg model.RouterConfig,
+	table string,
+	comment string,
+	disabled bool,
+) error {
+	f.setRuleCalls++
+	return nil
+}
+
 func (f *fakeRouterClient) AddressListContains(
 	ctx context.Context,
 	cfg model.RouterConfig,
@@ -220,6 +243,24 @@ func (f *fakeRouterClient) AddressListContains(
 ) (bool, error) {
 	key := list + "|" + address
 	return f.membershipMap[key], nil
+}
+
+func (f *fakeRouterClient) GetFirewallRuleEnabled(
+	ctx context.Context,
+	cfg model.RouterConfig,
+	table string,
+	ruleID string,
+) (bool, error) {
+	return true, nil
+}
+
+func (f *fakeRouterClient) GetFirewallRulesEnabledByComment(
+	ctx context.Context,
+	cfg model.RouterConfig,
+	table string,
+	comment string,
+) (bool, error) {
+	return true, nil
 }
 
 type fakeAction struct {

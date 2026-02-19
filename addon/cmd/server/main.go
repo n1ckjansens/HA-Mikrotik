@@ -80,7 +80,9 @@ func main() {
 
 	reg := automationregistry.New()
 	reg.RegisterAction(mikrotikactions.NewAddressListMembershipAction())
+	reg.RegisterAction(mikrotikactions.NewFirewallRuleToggleAction())
 	reg.RegisterStateSource(mikrotikstatesources.NewAddressListMembershipSource())
+	reg.RegisterStateSource(mikrotikstatesources.NewFirewallRuleEnabledSource())
 
 	engine := automationengine.New(
 		automationRepo,

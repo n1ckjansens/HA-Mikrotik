@@ -27,6 +27,24 @@ func (f *fakeStateClient) AddressListContains(
 	return f.contains, nil
 }
 
+func (f *fakeStateClient) GetFirewallRuleEnabled(
+	ctx context.Context,
+	cfg model.RouterConfig,
+	table string,
+	ruleID string,
+) (bool, error) {
+	return false, nil
+}
+
+func (f *fakeStateClient) GetFirewallRulesEnabledByComment(
+	ctx context.Context,
+	cfg model.RouterConfig,
+	table string,
+	comment string,
+) (bool, error) {
+	return false, nil
+}
+
 func TestAddressListMembershipSourceRead(t *testing.T) {
 	source := NewAddressListMembershipSource()
 	ip := "192.168.88.15"

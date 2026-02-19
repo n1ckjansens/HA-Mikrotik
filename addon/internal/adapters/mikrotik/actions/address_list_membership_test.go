@@ -39,6 +39,26 @@ func (f *fakeAddressListClient) RemoveAddressListEntry(
 	return nil
 }
 
+func (f *fakeAddressListClient) SetFirewallRuleDisabled(
+	ctx context.Context,
+	cfg model.RouterConfig,
+	table string,
+	ruleID string,
+	disabled bool,
+) error {
+	return nil
+}
+
+func (f *fakeAddressListClient) SetFirewallRulesDisabledByComment(
+	ctx context.Context,
+	cfg model.RouterConfig,
+	table string,
+	comment string,
+	disabled bool,
+) error {
+	return nil
+}
+
 func TestAddressListMembershipActionExecuteAdd(t *testing.T) {
 	action := NewAddressListMembershipAction()
 	ip := "192.168.88.10"
