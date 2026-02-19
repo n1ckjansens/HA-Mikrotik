@@ -6,6 +6,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { APP_BASE_PATH } from "@/lib/ingress";
 import { DevicesPage } from "@/pages/DevicesPage";
 import { AssignmentsPage } from "@/pages/automation/AssignmentsPage";
 import { CapabilitiesPage } from "@/pages/automation/CapabilitiesPage";
@@ -21,7 +22,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={APP_BASE_PATH}>
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<DevicesPage />} />

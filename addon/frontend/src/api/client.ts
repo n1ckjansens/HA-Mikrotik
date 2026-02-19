@@ -1,3 +1,5 @@
+import { withAppBase } from "@/lib/ingress";
+
 export class ApiError extends Error {
   public code: string;
 
@@ -26,7 +28,7 @@ async function parseError(response: Response): Promise<never> {
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(withAppBase(path), {
     ...init,
     headers: {
       "Content-Type": "application/json",
