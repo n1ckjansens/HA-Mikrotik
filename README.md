@@ -18,6 +18,17 @@ No duplicate manual configuration is required in the add-on.
 - `addon/` - Go backend, SQLite persistence, RouterOS poller, ingress server.
 - `addon/frontend/` - React/Vite/TypeScript UI with shadcn/ui.
 
+### Backend Architecture (`addon/internal`)
+
+- `config` - runtime config loading from env.
+- `logging` - centralized slog initialization.
+- `domain/device`, `domain/automation` - domain models and interfaces.
+- `services/device`, `services/automation` - use-cases and automation engine.
+- `services/automation/registry` - pluggable `Action` and `StateSource` registry.
+- `repository/sqlite` - repository implementations and migrations.
+- `adapters/mikrotik` - RouterOS adapter + action/state-source primitives.
+- `http` and `http/handlers` - transport layer (router, middleware, handlers).
+
 ## Features
 
 - RouterOS v7 REST polling (`/ip/dhcp-server/lease`, `/interface/wifi/registration-table`, `/interface/bridge/host`, `/ip/arp`, `/ip/address`).
@@ -59,6 +70,17 @@ npm run build
 - `POST /api/devices/{mac}/register`
 - `PATCH /api/devices/{mac}`
 - `POST /api/refresh`
+- `GET /api/automation/action-types`
+- `GET /api/automation/state-source-types`
+- `GET /api/automation/capabilities`
+- `GET /api/automation/capabilities/{id}`
+- `POST /api/automation/capabilities`
+- `PUT /api/automation/capabilities/{id}`
+- `DELETE /api/automation/capabilities/{id}`
+- `GET /api/automation/capabilities/{id}/devices`
+- `PATCH /api/automation/capabilities/{id}/devices/{mac}`
+- `GET /api/devices/{mac}/capabilities`
+- `PATCH /api/devices/{mac}/capabilities/{capabilityId}`
 - `GET /healthz`
 
 All API routes are ingress-aware.

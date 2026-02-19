@@ -7,17 +7,17 @@ import (
 	"time"
 
 	"github.com/micro-ha/mikrotik-presence/addon/internal/configsync"
-	"github.com/micro-ha/mikrotik-presence/addon/internal/service"
+	devicedomain "github.com/micro-ha/mikrotik-presence/addon/internal/domain/device"
 )
 
 type Poller struct {
-	service   *service.Service
+	service   devicedomain.Service
 	config    *configsync.Manager
 	refreshCh chan struct{}
 	logger    *slog.Logger
 }
 
-func New(svc *service.Service, cfg *configsync.Manager, logger *slog.Logger) *Poller {
+func New(svc devicedomain.Service, cfg *configsync.Manager, logger *slog.Logger) *Poller {
 	return &Poller{service: svc, config: cfg, refreshCh: make(chan struct{}, 1), logger: logger}
 }
 
@@ -44,7 +44,7 @@ func (p *Poller) Run(ctx context.Context) {
 		case <-timer.C:
 		}
 		if err := p.service.PollOnce(ctx); err != nil {
-			if errors.Is(err, service.ErrIntegrationNotConfigured) {
+			if errors.Is(err, devicedomain.ErrIntegrationNotConfigured) {
 				p.logger.Info("poll skipped; integration not configured")
 				continue
 			}

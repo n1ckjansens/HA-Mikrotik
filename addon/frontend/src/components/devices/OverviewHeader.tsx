@@ -59,12 +59,7 @@ export function OverviewHeader({
 
   return (
     <TooltipProvider>
-      <header className="flex flex-col gap-3 py-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">MikroTik Presence</h1>
-          <p className="text-sm text-muted-foreground">RouterOS v7 device monitoring</p>
-        </div>
-
+      <header className="flex flex-col gap-3 pt-0 pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-3 md:flex-nowrap">
           <div className="flex items-center gap-2 text-sm">
             <span className="relative flex h-2 w-2 items-center justify-center">

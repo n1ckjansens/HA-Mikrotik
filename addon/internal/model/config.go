@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"net/url"
+	"strings"
+	"time"
+)
 
 // RouterConfig represents a normalized integration configuration payload.
 type RouterConfig struct {
@@ -24,9 +28,40 @@ func (c RouterConfig) PollInterval() time.Duration {
 }
 
 func (c RouterConfig) BaseURL() string {
-	scheme := "https"
+	defaultScheme := "https"
 	if !c.SSL {
-		scheme = "http"
+		defaultScheme = "http"
 	}
-	return scheme + "://" + c.Host + "/rest"
+
+	raw := strings.TrimSpace(c.Host)
+	if raw == "" {
+		return defaultScheme + ":///rest"
+	}
+	if !strings.Contains(raw, "://") {
+		raw = defaultScheme + "://" + raw
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil || strings.TrimSpace(parsed.Host) == "" {
+		host := strings.TrimSpace(c.Host)
+		host = strings.TrimPrefix(strings.TrimPrefix(host, "http://"), "https://")
+		host = strings.Trim(host, "/")
+		return defaultScheme + "://" + host + "/rest"
+	}
+
+	scheme := strings.TrimSpace(parsed.Scheme)
+	if scheme == "" {
+		scheme = defaultScheme
+	}
+	path := strings.TrimSuffix(strings.TrimSpace(parsed.Path), "/")
+	switch {
+	case path == "", path == "/":
+		path = "/rest"
+	case strings.HasSuffix(path, "/rest"):
+		// Keep an explicit REST path (for example behind reverse proxy).
+	default:
+		path = path + "/rest"
+	}
+
+	return scheme + "://" + parsed.Host + path
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -33,6 +34,7 @@ func (e *HTTPStatusError) Error() string {
 
 type Client struct {
 	httpClient *http.Client
+	logger     *slog.Logger
 }
 
 func NewClient() *Client {
@@ -47,6 +49,18 @@ func NewClientWithHTTPClient(httpClient *http.Client) *Client {
 		httpClient.Timeout = defaultTimeout
 	}
 	return &Client{httpClient: httpClient}
+}
+
+func (c *Client) WithLogger(logger *slog.Logger) *Client {
+	c.logger = logger
+	return c
+}
+
+func (c *Client) logRouterRequest(operation string, method string, endpoint string) {
+	if c == nil || c.logger == nil {
+		return
+	}
+	c.logger.Info("routeros request", "operation", operation, "method", method, "endpoint", endpoint)
 }
 
 func (c *Client) FetchSnapshot(ctx context.Context, cfg model.RouterConfig) (*Snapshot, error) {
@@ -223,16 +237,21 @@ func fetchRows(ctx context.Context, client *http.Client, endpoint string, cfg mo
 			return rows, nil
 		}
 		if isMissingEndpointError(err) {
-			return nil, err
+			return nil, fmt.Errorf("routeros GET %s failed: %w", endpoint, err)
 		}
-		lastErr = err
+		lastErr = fmt.Errorf("routeros GET %s failed: %w", endpoint, err)
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, fmt.Errorf("routeros GET %s canceled: %w", endpoint, ctx.Err())
 		case <-time.After(time.Duration(attempt) * 400 * time.Millisecond):
 		}
 	}
-	return nil, fmt.Errorf("routeros request failed for %s: %w", endpoint, lastErr)
+	return nil, fmt.Errorf(
+		"routeros GET %s failed after %d attempts: %w",
+		endpoint,
+		maxRetryAttempts,
+		lastErr,
+	)
 }
 
 func fetchRowsWithHTTPSFallback(
@@ -322,6 +341,9 @@ func shouldFallbackToHTTP(cfg model.RouterConfig, endpoint string, err error) bo
 	if !cfg.SSL || !strings.HasPrefix(endpoint, "https://") {
 		return false
 	}
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
 	if isMissingEndpointError(err) {
 		return false
 	}
@@ -333,6 +355,9 @@ func isLikelyHTTPSServiceMismatch(err error) bool {
 	if errors.As(err, &urlErr) && urlErr.Err != nil {
 		err = urlErr.Err
 	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
 
 	var opErr *net.OpError
 	if errors.As(err, &opErr) {
@@ -340,6 +365,10 @@ func isLikelyHTTPSServiceMismatch(err error) bool {
 		if strings.Contains(lower, "refused") {
 			return true
 		}
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
 	}
 
 	lower := strings.ToLower(err.Error())

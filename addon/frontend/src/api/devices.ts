@@ -29,12 +29,13 @@ export async function fetchDevices(params: DevicesFilterParams): Promise<Device[
     query.set("query", params.query.trim());
   }
 
-  const raw = await apiRequest<unknown>(`api/devices?${query.toString()}`);
+  const suffix = query.toString();
+  const raw = await apiRequest<unknown>(suffix ? `/api/devices?${suffix}` : "/api/devices");
   return listDevicesResponseSchema.parse(raw).items;
 }
 
 export async function fetchDevice(mac: string): Promise<Device> {
-  const raw = await apiRequest<unknown>(`api/devices/${encodeURIComponent(mac)}`);
+  const raw = await apiRequest<unknown>(`/api/devices/${encodeURIComponent(mac)}`);
   return deviceSchema.parse(raw);
 }
 
@@ -48,7 +49,7 @@ export type RegisterDeviceInput = z.infer<typeof registerDeviceSchema>;
 
 export async function registerDevice(mac: string, input: RegisterDeviceInput) {
   const payload = registerDeviceSchema.parse(input);
-  return apiRequest<{ ok: true }>(`api/devices/${encodeURIComponent(mac)}/register`, {
+  return apiRequest<{ ok: true }>(`/api/devices/${encodeURIComponent(mac)}/register`, {
     method: "POST",
     body: JSON.stringify(payload)
   });
@@ -56,12 +57,12 @@ export async function registerDevice(mac: string, input: RegisterDeviceInput) {
 
 export async function patchDevice(mac: string, input: RegisterDeviceInput) {
   const payload = registerDeviceSchema.partial().parse(input);
-  return apiRequest<{ ok: true }>(`api/devices/${encodeURIComponent(mac)}`, {
+  return apiRequest<{ ok: true }>(`/api/devices/${encodeURIComponent(mac)}`, {
     method: "PATCH",
     body: JSON.stringify(payload)
   });
 }
 
 export async function refreshDevices() {
-  return apiRequest<{ ok: true }>("api/refresh", { method: "POST", body: "{}" });
+  return apiRequest<{ ok: true }>("/api/refresh", { method: "POST", body: "{}" });
 }

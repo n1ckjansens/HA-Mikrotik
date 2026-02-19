@@ -87,6 +87,20 @@ func (r *Repository) migrate(ctx context.Context) error {
 			vendor TEXT NOT NULL,
 			generated_name TEXT NOT NULL
 		);`,
+		`CREATE TABLE IF NOT EXISTS capability_templates (
+			id TEXT PRIMARY KEY,
+			data TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);`,
+		`CREATE TABLE IF NOT EXISTS device_capabilities_state (
+			device_id TEXT NOT NULL,
+			capability_id TEXT NOT NULL,
+			enabled INTEGER NOT NULL,
+			state TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			PRIMARY KEY (device_id, capability_id)
+		);`,
 	}
 
 	for _, stmt := range statements {
@@ -95,6 +109,15 @@ func (r *Repository) migrate(ctx context.Context) error {
 		}
 	}
 	if _, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_devices_state_online ON devices_state(online);`); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_capabilities_updated_at ON capability_templates(updated_at);`); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_device_cap_state_device ON device_capabilities_state(device_id);`); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_device_cap_state_capability ON device_capabilities_state(capability_id);`); err != nil {
 		return err
 	}
 	if err := r.ensureStateColumns(ctx); err != nil {

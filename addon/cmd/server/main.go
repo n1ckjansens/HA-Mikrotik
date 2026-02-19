@@ -7,20 +7,26 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
+	"github.com/micro-ha/mikrotik-presence/addon/internal/adapters/ha"
+	mikrotikadapter "github.com/micro-ha/mikrotik-presence/addon/internal/adapters/mikrotik"
+	mikrotikactions "github.com/micro-ha/mikrotik-presence/addon/internal/adapters/mikrotik/actions"
+	mikrotikstatesources "github.com/micro-ha/mikrotik-presence/addon/internal/adapters/mikrotik/statesources"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/aggregator"
+	"github.com/micro-ha/mikrotik-presence/addon/internal/config"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/configsync"
-	httpapi "github.com/micro-ha/mikrotik-presence/addon/internal/http"
-	"github.com/micro-ha/mikrotik-presence/addon/internal/model"
+	"github.com/micro-ha/mikrotik-presence/addon/internal/http"
+	"github.com/micro-ha/mikrotik-presence/addon/internal/http/handlers"
+	"github.com/micro-ha/mikrotik-presence/addon/internal/logging"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/oui"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/poller"
-	"github.com/micro-ha/mikrotik-presence/addon/internal/routeros"
-	"github.com/micro-ha/mikrotik-presence/addon/internal/service"
-	"github.com/micro-ha/mikrotik-presence/addon/internal/storage"
+	"github.com/micro-ha/mikrotik-presence/addon/internal/repository/sqlite"
+	automationservice "github.com/micro-ha/mikrotik-presence/addon/internal/services/automation"
+	automationengine "github.com/micro-ha/mikrotik-presence/addon/internal/services/automation/engine"
+	automationregistry "github.com/micro-ha/mikrotik-presence/addon/internal/services/automation/registry"
+	deviceservice "github.com/micro-ha/mikrotik-presence/addon/internal/services/device"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/subnet"
 )
 
@@ -28,20 +34,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	cfg := config.Load()
+	logger := logging.New(cfg.LogLevel)
 
-	dbPath := env("DB_PATH", "/data/mikrotik_presence.db")
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+	if err := os.MkdirAll(cfg.DBDir(), 0o755); err != nil {
 		logger.Error("failed to create db directory", "err", err)
 		os.Exit(1)
 	}
 
-	repo, err := storage.New(ctx, dbPath, logger)
+	db, err := sqlite.Open(ctx, cfg.DBPath, logger)
 	if err != nil {
 		logger.Error("failed to initialize storage", "err", err)
 		os.Exit(1)
 	}
-	defer repo.Close()
+	defer db.Close()
 
 	ouiDB, err := oui.LoadEmbedded()
 	if err != nil {
@@ -49,39 +55,58 @@ func main() {
 		os.Exit(1)
 	}
 
-	routerClient := routeros.NewClient()
-	thresholds := model.PresenceThresholds{
-		WiFiIdleThreshold: parseDurationEnv("WIFI_IDLE_THRESHOLD", 5*time.Minute, logger),
-		DHCPRecentThreshold: parseDurationEnv(
-			"DHCP_RECENT_THRESHOLD",
-			30*time.Minute,
-			logger,
-		),
-		OfflineHardThreshold: parseDurationEnv(
-			"OFFLINE_HARD_THRESHOLD",
-			24*time.Hour,
-			logger,
-		),
-	}.Normalize()
+	routerClient := mikrotikadapter.NewRestClient(logger.With("component", "routeros"))
+	agg := aggregator.NewWithThresholds(subnet.New(), ouiDB, cfg.PresenceThresholds)
 
-	agg := aggregator.NewWithThresholds(subnet.New(), ouiDB, thresholds)
-
-	haBaseURL := env("HA_BASE_URL", "http://supervisor/core")
-	supervisorToken := os.Getenv("SUPERVISOR_TOKEN")
-	cfgClient := configsync.NewClient(haBaseURL, supervisorToken)
-	cfgManager := configsync.NewManager(cfgClient, logger)
+	cfgClient := configsync.NewClient(cfg.HABaseURL, cfg.SupervisorToken)
+	cfgManager := configsync.NewManager(cfgClient, logger.With("component", "configsync"))
+	haConfig := ha.NewManagerAdapter(cfgManager)
 
 	if _, err := cfgManager.Refresh(ctx); err != nil {
 		logger.Warn("initial config refresh failed", "err", err)
 	}
 
-	svc := service.NewWithThresholds(repo, agg, routerClient, cfgManager, logger, thresholds)
-	devicePoller := poller.New(svc, cfgManager, logger)
+	deviceRepo := sqlite.NewDeviceRepository(db)
+	automationRepo := sqlite.NewAutomationRepository(db)
 
+	deviceSvc := deviceservice.NewWithThresholds(
+		deviceRepo,
+		agg,
+		routerClient,
+		haConfig,
+		logger.With("service", "device"),
+		cfg.PresenceThresholds,
+	)
+
+	reg := automationregistry.New()
+	reg.RegisterAction(mikrotikactions.NewAddressListMembershipAction())
+	reg.RegisterStateSource(mikrotikstatesources.NewAddressListMembershipSource())
+
+	engine := automationengine.New(
+		automationRepo,
+		deviceSvc,
+		reg,
+		haConfig,
+		routerClient,
+		logger.With("service", "automation_engine"),
+	)
+	automationSvc := automationservice.New(
+		automationRepo,
+		deviceSvc,
+		engine,
+		reg,
+		logger.With("service", "automation"),
+	)
+
+	devicePoller := poller.New(deviceSvc, cfgManager, logger.With("component", "poller"))
 	go runConfigFallbackRefresh(ctx, cfgManager, devicePoller, logger)
+	go devicePoller.Run(ctx)
+	devicePoller.TriggerRefresh()
 
-	if supervisorToken != "" {
-		watcher := configsync.NewWatcher(haBaseURL, supervisorToken, logger)
+	go engine.RunSyncLoop(ctx, cfg.AutomationSyncInterval)
+
+	if cfg.SupervisorToken != "" {
+		watcher := configsync.NewWatcher(cfg.HABaseURL, cfg.SupervisorToken, logger.With("component", "configsync-watcher"))
 		go watcher.Run(ctx, func() {
 			refreshCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
@@ -98,20 +123,18 @@ func main() {
 		logger.Warn("SUPERVISOR_TOKEN is empty; config sync watcher disabled")
 	}
 
-	go devicePoller.Run(ctx)
-	devicePoller.TriggerRefresh()
-
-	api := httpapi.New(
-		svc,
+	api := handlers.New(
+		deviceSvc,
+		automationSvc,
 		devicePoller,
-		cfgManager,
-		logger,
-		env("FRONTEND_DIST", "/app/frontend/dist"),
+		haConfig,
+		logger.With("component", "http"),
+		cfg.FrontendDist,
 	)
 
 	httpServer := &http.Server{
-		Addr:              env("HTTP_ADDR", ":8099"),
-		Handler:           api.Handler(),
+		Addr:              cfg.HTTPAddr,
+		Handler:           httpapi.NewRouter(api),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -119,7 +142,7 @@ func main() {
 	}
 
 	logger.Info("server starting", "addr", httpServer.Addr)
-	if err := httpapi.RunServer(ctx, httpServer, logger); err != nil && !errors.Is(err, context.Canceled) {
+	if err := httpapi.RunServer(ctx, httpServer); err != nil && !errors.Is(err, context.Canceled) {
 		logger.Error("server terminated with error", "err", err)
 		os.Exit(1)
 	}
@@ -146,24 +169,4 @@ func runConfigFallbackRefresh(ctx context.Context, cfg *configsync.Manager, p *p
 			}
 		}
 	}
-}
-
-func env(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok && value != "" {
-		return value
-	}
-	return fallback
-}
-
-func parseDurationEnv(key string, fallback time.Duration, logger *slog.Logger) time.Duration {
-	raw, ok := os.LookupEnv(key)
-	if !ok || strings.TrimSpace(raw) == "" {
-		return fallback
-	}
-	value, err := time.ParseDuration(strings.TrimSpace(raw))
-	if err != nil {
-		logger.Warn("invalid duration env; using fallback", "key", key, "value", raw, "fallback", fallback.String())
-		return fallback
-	}
-	return value
 }

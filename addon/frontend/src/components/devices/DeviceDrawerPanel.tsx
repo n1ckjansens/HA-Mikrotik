@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { CopyValue } from "@/components/devices/CopyValue";
+import { DeviceControlsSection } from "@/components/devices/DeviceControlsSection";
 import { DeviceStatusBadge } from "@/components/device/DeviceStatusBadge";
 import { DeviceTypeIcon } from "@/components/device/DeviceTypeIcon";
 import { Badge } from "@/components/ui/badge";
@@ -175,10 +176,11 @@ export function DeviceDrawerPanel({
       ) : null}
 
       <Tabs defaultValue="identity" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="identity">Identity</TabsTrigger>
           <TabsTrigger value="network">Network</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="controls">Controls</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
           <TabsTrigger value="registration">Registration</TabsTrigger>
         </TabsList>
@@ -294,6 +296,10 @@ export function DeviceDrawerPanel({
               <p>{formatExactTimestamp(device?.updated_at)}</p>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="controls" className="space-y-4 pt-4">
+          {device ? <DeviceControlsSection deviceId={device.mac} /> : null}
         </TabsContent>
 
         <TabsContent value="notes" className="space-y-4 pt-4">

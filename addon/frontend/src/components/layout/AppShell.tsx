@@ -7,7 +7,7 @@ type Props = {
 
 export function AppShell({ header, children }: Props) {
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-6 p-4 md:p-6">
+    <main className="flex flex-col gap-6">
       {header}
       {children}
     </main>

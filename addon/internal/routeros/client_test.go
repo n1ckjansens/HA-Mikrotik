@@ -99,3 +99,10 @@ func TestFetchSnapshotFallsBackToHTTPOnHTTPSMismatch(t *testing.T) {
 		t.Fatalf("unexpected snapshot lengths: %+v", snapshot)
 	}
 }
+
+func TestShouldFallbackToHTTPOnDeadlineExceeded(t *testing.T) {
+	cfg := model.RouterConfig{SSL: true}
+	if !shouldFallbackToHTTP(cfg, "https://router.local/rest/ip/address", context.DeadlineExceeded) {
+		t.Fatalf("expected fallback to HTTP for deadline exceeded")
+	}
+}
