@@ -14,10 +14,17 @@ type Service interface {
 	DeleteCapability(ctx context.Context, capabilityID string) error
 
 	GetDeviceCapabilities(ctx context.Context, deviceID string) ([]CapabilityUIModel, error)
+	GetGlobalCapabilities(ctx context.Context) ([]CapabilityUIModel, error)
 	ListCapabilityAssignments(ctx context.Context, capabilityID string) ([]CapabilityDeviceAssignment, error)
 	PatchDeviceCapability(
 		ctx context.Context,
 		deviceID string,
+		capabilityID string,
+		state *string,
+		enabled *bool,
+	) (SetStateResult, error)
+	PatchGlobalCapability(
+		ctx context.Context,
 		capabilityID string,
 		state *string,
 		enabled *bool,

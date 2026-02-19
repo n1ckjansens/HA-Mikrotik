@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	devicedomain "github.com/micro-ha/mikrotik-presence/addon/internal/domain/device"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/model"
 )
 
@@ -15,7 +14,7 @@ type AddressListStateClient interface {
 
 // StateSourceContext contains runtime dependencies for state reads.
 type StateSourceContext struct {
-	Device       devicedomain.Device
+	Target       AutomationTarget
 	RouterClient AddressListStateClient
 	RouterConfig model.RouterConfig
 	Logger       *slog.Logger
@@ -34,6 +33,6 @@ type StateSourceMetadata struct {
 type StateSource interface {
 	ID() string
 	Metadata() StateSourceMetadata
-	Validate(params map[string]any) error
+	Validate(target AutomationTarget, params map[string]any) error
 	Read(ctx context.Context, sourceCtx StateSourceContext, params map[string]any) (any, error)
 }

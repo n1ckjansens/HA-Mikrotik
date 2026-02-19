@@ -22,6 +22,12 @@ func validateTemplate(template automationdomain.CapabilityTemplate, reg *registr
 	if strings.TrimSpace(template.Label) == "" {
 		return fmt.Errorf("label is required")
 	}
+	scope := strings.TrimSpace(string(template.Scope))
+	if scope != "" && scope != string(automationdomain.ScopeDevice) && scope != string(automationdomain.ScopeGlobal) {
+		return fmt.Errorf("scope must be device or global")
+	}
+	template.Scope = automationdomain.NormalizeCapabilityScope(template.Scope)
+	target := automationdomain.AutomationTarget{Scope: template.Scope}
 	if len(template.States) == 0 {
 		return fmt.Errorf("states are required")
 	}
@@ -51,7 +57,7 @@ func validateTemplate(template automationdomain.CapabilityTemplate, reg *registr
 			if !ok {
 				return fmt.Errorf("state %q has unknown action type %q", stateID, action.TypeID)
 			}
-			if err := actionType.Validate(action.Params); err != nil {
+			if err := actionType.Validate(target, action.Params); err != nil {
 				return fmt.Errorf("state %q action %q: %w", stateID, action.TypeID, err)
 			}
 		}
@@ -65,7 +71,7 @@ func validateTemplate(template automationdomain.CapabilityTemplate, reg *registr
 		if !ok {
 			return fmt.Errorf("sync source type %q is not registered", template.Sync.Source.TypeID)
 		}
-		if err := source.Validate(template.Sync.Source.Params); err != nil {
+		if err := source.Validate(target, template.Sync.Source.Params); err != nil {
 			return fmt.Errorf("sync source params: %w", err)
 		}
 		if strings.TrimSpace(template.Sync.Mapping.WhenTrue) != "" {
@@ -101,6 +107,7 @@ func normalizeTemplate(template automationdomain.CapabilityTemplate) automationd
 	template.Label = strings.TrimSpace(template.Label)
 	template.Description = strings.TrimSpace(template.Description)
 	template.Category = strings.TrimSpace(template.Category)
+	template.Scope = automationdomain.NormalizeCapabilityScope(template.Scope)
 	template.DefaultState = strings.TrimSpace(template.DefaultState)
 	if template.Control.Type == automationdomain.ControlSwitch && len(template.Control.Options) == 0 {
 		template.Control.Options = []automationdomain.CapabilityControlOption{

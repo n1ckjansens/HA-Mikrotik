@@ -27,8 +27,10 @@ import {
   buildStateMapFromOptions,
   createEmptyCapabilityTemplate,
   defaultValueForActionField,
+  hasScopeViolationForGlobal,
   normalizeControl,
-  resolveVisibleFields
+  resolveVisibleFields,
+  scopeParamSchema
 } from "@/lib/automation";
 import type { CapabilityTemplate, ControlType, StateSourceType } from "@/types/automation";
 
@@ -72,6 +74,32 @@ function defaultSyncConfig(
   };
 }
 
+function applyScopeToStateSourceTypes(
+  sourceTypes: StateSourceType[],
+  scope: CapabilityTemplate["scope"]
+) {
+  return sourceTypes.map((item) => ({
+    ...item,
+    param_schema: scopeParamSchema(item.param_schema, scope)
+  }));
+}
+
+function hasGlobalScopeParamViolations(template: CapabilityTemplate) {
+  if (template.scope !== "global") {
+    return false;
+  }
+
+  for (const state of Object.values(template.states)) {
+    for (const action of state.actions_on_enter) {
+      if (hasScopeViolationForGlobal(action.params)) {
+        return true;
+      }
+    }
+  }
+
+  return hasScopeViolationForGlobal(template.sync?.source.params ?? {});
+}
+
 export function CapabilityEditorPage() {
   const navigate = useNavigate();
   const params = useParams();
@@ -85,7 +113,19 @@ export function CapabilityEditorPage() {
   const [actionDialogStateId, setActionDialogStateId] = useState<string | null>(null);
 
   const title = editor.isNew ? "New capability" : `Edit ${capabilityId}`;
-  const stateSourceTypes = stateSourceTypesQuery.data ?? [];
+  const actionTypes = useMemo(
+    () =>
+      (actionTypesQuery.data ?? []).map((item) => ({
+        ...item,
+        param_schema: scopeParamSchema(item.param_schema, draft.scope)
+      })),
+    [actionTypesQuery.data, draft.scope]
+  );
+
+  const stateSourceTypes = useMemo(
+    () => applyScopeToStateSourceTypes(stateSourceTypesQuery.data ?? [], draft.scope),
+    [stateSourceTypesQuery.data, draft.scope]
+  );
 
   useEffect(() => {
     if (!editor.isNew && editor.capabilityQuery.data) {
@@ -366,6 +406,10 @@ export function CapabilityEditorPage() {
   }, [draft.control.options, draft.default_state, draft.sync]);
 
   const handleSave = async () => {
+    if (hasGlobalScopeParamViolations(draft)) {
+      toast.error("Global scope does not allow device placeholders in actions or sync params.");
+      return;
+    }
     try {
       await editor.saveCapability(draft);
       toast.success("Capability saved");
@@ -465,6 +509,30 @@ export function CapabilityEditorPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Scope</Label>
+                <RadioGroup
+                  value={draft.scope}
+                  onValueChange={(value) => {
+                    if (value === "device" || value === "global") {
+                      setDraft((current) => ({
+                        ...current,
+                        scope: value
+                      }));
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="device" id="scope-device" />
+                    <Label htmlFor="scope-device">Per-device</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="global" id="scope-global" />
+                    <Label htmlFor="scope-global">Global</Label>
+                  </div>
+                </RadioGroup>
               </div>
             </CardContent>
           </Card>
@@ -572,7 +640,7 @@ export function CapabilityEditorPage() {
                 key={stateId}
                 stateId={stateId}
                 stateConfig={state}
-                actionTypes={actionTypesQuery.data ?? []}
+                actionTypes={actionTypes}
                 onStateLabelChange={updateStateLabel}
                 onAddAction={addActionToState}
                 onRemoveAction={removeActionFromState}
@@ -913,7 +981,8 @@ export function CapabilityEditorPage() {
             setActionDialogStateId(null);
           }
         }}
-        actionTypes={actionTypesQuery.data ?? []}
+        actionTypes={actionTypes}
+        scope={draft.scope}
         onSave={(action) => {
           if (!actionDialogStateId) {
             return;

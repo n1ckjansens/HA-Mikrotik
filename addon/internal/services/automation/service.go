@@ -160,6 +160,9 @@ func (s *Service) GetDeviceCapabilities(
 
 	items := make([]automationdomain.CapabilityUIModel, 0, len(templates))
 	for _, template := range templates {
+		if automationdomain.NormalizeCapabilityScope(template.Scope) != automationdomain.ScopeDevice {
+			continue
+		}
 		state := template.DefaultState
 		enabled := true
 		if saved, ok := states[template.ID]; ok {
@@ -196,6 +199,9 @@ func (s *Service) ListCapabilityAssignments(
 	}
 	if err != nil {
 		return nil, err
+	}
+	if automationdomain.NormalizeCapabilityScope(template.Scope) != automationdomain.ScopeDevice {
+		return nil, fmt.Errorf("%w: capability %q is not device-scoped", automationdomain.ErrCapabilityScopeMismatch, template.ID)
 	}
 
 	devices, err := s.devices.ListDevices(ctx, devicedomain.ListFilter{})
@@ -248,7 +254,10 @@ func (s *Service) PatchDeviceCapability(
 	}
 
 	if state != nil {
-		stateResult, err := s.engine.SetCapabilityState(ctx, deviceID, capabilityID, *state)
+		stateResult, err := s.engine.SetCapabilityState(ctx, automationdomain.CapabilityTargetRef{
+			Scope:    automationdomain.ScopeDevice,
+			DeviceID: deviceID,
+		}, capabilityID, *state)
 		if err != nil {
 			return automationdomain.SetStateResult{}, err
 		}
@@ -283,6 +292,9 @@ func (s *Service) SetDeviceCapabilityEnabled(
 	if err != nil {
 		return err
 	}
+	if automationdomain.NormalizeCapabilityScope(template.Scope) != automationdomain.ScopeDevice {
+		return fmt.Errorf("%w: capability %q is not device-scoped", automationdomain.ErrCapabilityScopeMismatch, template.ID)
+	}
 
 	current, exists, err := s.repo.GetDeviceCapabilityState(ctx, deviceID, capabilityID)
 	if err != nil {
@@ -301,6 +313,119 @@ func (s *Service) SetDeviceCapabilityEnabled(
 		current.State = template.DefaultState
 	}
 	return s.repo.UpsertDeviceCapabilityState(ctx, current)
+}
+
+// GetGlobalCapabilities returns global capabilities for controls UI.
+func (s *Service) GetGlobalCapabilities(
+	ctx context.Context,
+) ([]automationdomain.CapabilityUIModel, error) {
+	templates, err := s.repo.ListTemplates(ctx, "", "")
+	if err != nil {
+		return nil, err
+	}
+	states, err := s.repo.ListGlobalCapabilities(ctx)
+	if err != nil {
+		return nil, err
+	}
+	stateMap := make(map[string]automationdomain.GlobalCapability, len(states))
+	for _, item := range states {
+		stateMap[item.CapabilityID] = item
+	}
+
+	items := make([]automationdomain.CapabilityUIModel, 0, len(templates))
+	for _, template := range templates {
+		if automationdomain.NormalizeCapabilityScope(template.Scope) != automationdomain.ScopeGlobal {
+			continue
+		}
+		state := template.DefaultState
+		enabled := true
+		if saved, ok := stateMap[template.ID]; ok {
+			if strings.TrimSpace(saved.State) != "" {
+				state = saved.State
+			}
+			enabled = saved.Enabled
+		}
+		items = append(items, automationdomain.CapabilityUIModel{
+			ID:          template.ID,
+			Label:       template.Label,
+			Description: template.Description,
+			Control: automationdomain.CapabilityControlDTO{
+				Type:    template.Control.Type,
+				Options: append([]automationdomain.CapabilityControlOption(nil), template.Control.Options...),
+			},
+			State:   state,
+			Enabled: enabled,
+		})
+	}
+	sortCapabilityUIModels(items)
+	return items, nil
+}
+
+// PatchGlobalCapability updates state and/or enabled flag for global capability.
+func (s *Service) PatchGlobalCapability(
+	ctx context.Context,
+	capabilityID string,
+	state *string,
+	enabled *bool,
+) (automationdomain.SetStateResult, error) {
+	result := automationdomain.SetStateResult{OK: true}
+	if state == nil && enabled == nil {
+		return automationdomain.SetStateResult{}, fmt.Errorf("%w: either state or enabled must be provided", automationdomain.ErrCapabilityInvalid)
+	}
+
+	if state != nil {
+		stateResult, err := s.engine.SetCapabilityState(ctx, automationdomain.CapabilityTargetRef{
+			Scope: automationdomain.ScopeGlobal,
+		}, capabilityID, *state)
+		if err != nil {
+			return automationdomain.SetStateResult{}, err
+		}
+		result.Warnings = append(result.Warnings, stateResult.Warnings...)
+	}
+
+	if enabled != nil {
+		if err := s.SetGlobalCapabilityEnabled(ctx, capabilityID, *enabled); err != nil {
+			return automationdomain.SetStateResult{}, err
+		}
+	}
+	return result, nil
+}
+
+// SetGlobalCapabilityEnabled toggles global capability without executing actions.
+func (s *Service) SetGlobalCapabilityEnabled(
+	ctx context.Context,
+	capabilityID string,
+	enabled bool,
+) error {
+	capabilityID = strings.TrimSpace(capabilityID)
+	template, err := s.repo.GetTemplate(ctx, capabilityID)
+	if errors.Is(err, automationdomain.ErrNotFound) {
+		return automationdomain.ErrCapabilityNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if automationdomain.NormalizeCapabilityScope(template.Scope) != automationdomain.ScopeGlobal {
+		return fmt.Errorf("%w: capability %q is not global-scoped", automationdomain.ErrCapabilityScopeMismatch, template.ID)
+	}
+
+	current, err := s.repo.GetGlobalCapability(ctx, capabilityID)
+	if err != nil {
+		return err
+	}
+	if current == nil {
+		current = &automationdomain.GlobalCapability{
+			CapabilityID: capabilityID,
+			State:        template.DefaultState,
+			Enabled:      enabled,
+		}
+	} else {
+		current.Enabled = enabled
+		if strings.TrimSpace(current.State) == "" {
+			current.State = template.DefaultState
+		}
+	}
+	return s.repo.SaveGlobalCapability(ctx, current)
 }
 
 func (s *Service) requireDevice(ctx context.Context, deviceID string) (devicedomain.Device, error) {

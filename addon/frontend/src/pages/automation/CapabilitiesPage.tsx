@@ -128,6 +128,7 @@ export function CapabilitiesPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Scope</TableHead>
                 <TableHead>Control</TableHead>
                 <TableHead>States</TableHead>
                 <TableHead>HA expose</TableHead>
@@ -143,6 +144,11 @@ export function CapabilitiesPage() {
                     <p className="text-xs text-muted-foreground">{item.id}</p>
                   </TableCell>
                   <TableCell>{item.category || "-"}</TableCell>
+                  <TableCell>
+                    <Badge variant={item.scope === "global" ? "secondary" : "outline"}>
+                      {item.scope}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="capitalize">{item.control.type}</TableCell>
                   <TableCell>{Object.keys(item.states).length}</TableCell>
                   <TableCell>

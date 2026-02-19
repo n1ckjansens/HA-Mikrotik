@@ -17,7 +17,9 @@ func (f fakeAction) Metadata() automationdomain.ActionMetadata {
 	return automationdomain.ActionMetadata{ID: f.id, Label: f.id}
 }
 
-func (f fakeAction) Validate(params map[string]any) error { return nil }
+func (f fakeAction) Validate(target automationdomain.AutomationTarget, params map[string]any) error {
+	return nil
+}
 
 func (f fakeAction) Execute(
 	ctx context.Context,
@@ -37,7 +39,9 @@ func (f fakeStateSource) Metadata() automationdomain.StateSourceMetadata {
 	return automationdomain.StateSourceMetadata{ID: f.id, Label: f.id, OutputType: "boolean"}
 }
 
-func (f fakeStateSource) Validate(params map[string]any) error { return nil }
+func (f fakeStateSource) Validate(target automationdomain.AutomationTarget, params map[string]any) error {
+	return nil
+}
 
 func (f fakeStateSource) Read(
 	ctx context.Context,

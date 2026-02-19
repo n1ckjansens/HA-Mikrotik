@@ -15,14 +15,16 @@ import (
 )
 
 type memoryRepository struct {
-	templates map[string]automationdomain.CapabilityTemplate
-	states    map[string]automationdomain.DeviceCapability
+	templates    map[string]automationdomain.CapabilityTemplate
+	states       map[string]automationdomain.DeviceCapability
+	globalStates map[string]automationdomain.GlobalCapability
 }
 
 func newMemoryRepository() *memoryRepository {
 	return &memoryRepository{
-		templates: map[string]automationdomain.CapabilityTemplate{},
-		states:    map[string]automationdomain.DeviceCapability{},
+		templates:    map[string]automationdomain.CapabilityTemplate{},
+		states:       map[string]automationdomain.DeviceCapability{},
+		globalStates: map[string]automationdomain.GlobalCapability{},
 	}
 }
 
@@ -114,6 +116,40 @@ func (r *memoryRepository) ListCapabilityDeviceStates(
 	return out, nil
 }
 
+func (r *memoryRepository) GetGlobalCapability(
+	ctx context.Context,
+	capabilityID string,
+) (*automationdomain.GlobalCapability, error) {
+	item, ok := r.globalStates[capabilityID]
+	if !ok {
+		return nil, nil
+	}
+	out := item
+	return &out, nil
+}
+
+func (r *memoryRepository) SaveGlobalCapability(
+	ctx context.Context,
+	capability *automationdomain.GlobalCapability,
+) error {
+	if capability == nil {
+		return errors.New("global capability is nil")
+	}
+	r.globalStates[capability.CapabilityID] = *capability
+	return nil
+}
+
+func (r *memoryRepository) ListGlobalCapabilities(
+	ctx context.Context,
+) ([]automationdomain.GlobalCapability, error) {
+	out := make([]automationdomain.GlobalCapability, 0, len(r.globalStates))
+	for _, item := range r.globalStates {
+		out = append(out, item)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CapabilityID < out[j].CapabilityID })
+	return out, nil
+}
+
 func stateKey(deviceID string, capabilityID string) string {
 	return strings.ToUpper(deviceID) + "|" + capabilityID
 }
@@ -201,7 +237,9 @@ func (a *fakeAction) Metadata() automationdomain.ActionMetadata {
 	}
 }
 
-func (a *fakeAction) Validate(params map[string]any) error { return nil }
+func (a *fakeAction) Validate(target automationdomain.AutomationTarget, params map[string]any) error {
+	return nil
+}
 
 func (a *fakeAction) Execute(
 	ctx context.Context,
@@ -227,7 +265,9 @@ func (s *fakeStateSource) Metadata() automationdomain.StateSourceMetadata {
 	}
 }
 
-func (s *fakeStateSource) Validate(params map[string]any) error { return nil }
+func (s *fakeStateSource) Validate(target automationdomain.AutomationTarget, params map[string]any) error {
+	return nil
+}
 
 func (s *fakeStateSource) Read(
 	ctx context.Context,
@@ -275,7 +315,10 @@ func TestEngineSetCapabilityStateExecutesActionsAndPersistsState(t *testing.T) {
 		nil,
 	)
 
-	result, err := engine.SetCapabilityState(context.Background(), "AA:BB:CC:DD:EE:01", "routing.vpn", "on")
+	result, err := engine.SetCapabilityState(context.Background(), automationdomain.CapabilityTargetRef{
+		Scope:    automationdomain.ScopeDevice,
+		DeviceID: "AA:BB:CC:DD:EE:01",
+	}, "routing.vpn", "on")
 	if err != nil {
 		t.Fatalf("SetCapabilityState returned error: %v", err)
 	}
@@ -449,5 +492,124 @@ func TestEngineSyncOnceCanTriggerActions(t *testing.T) {
 	}
 	if !ok || stored.State != "on" {
 		t.Fatalf("unexpected stored sync state: %+v", stored)
+	}
+}
+
+func TestEngineSetCapabilityStateGlobalPersistsState(t *testing.T) {
+	repo := newMemoryRepository()
+	action := &fakeAction{id: "test.action"}
+	reg := registry.New()
+	reg.RegisterAction(action)
+
+	repo.templates["global.vpn_profile"] = automationdomain.CapabilityTemplate{
+		ID:           "global.vpn_profile",
+		Label:        "Global VPN profile",
+		Scope:        automationdomain.ScopeGlobal,
+		Control:      automationdomain.CapabilityControl{Type: automationdomain.ControlSwitch, Options: []automationdomain.CapabilityControlOption{{Value: "on", Label: "On"}, {Value: "off", Label: "Off"}}},
+		DefaultState: "off",
+		States: map[string]automationdomain.CapabilityStateConfig{
+			"on": {
+				Label:          "On",
+				ActionsOnEnter: []automationdomain.ActionInstance{{ID: "a1", TypeID: "test.action", Params: map[string]any{}}},
+			},
+			"off": {Label: "Off"},
+		},
+	}
+
+	engine := New(
+		repo,
+		&fakeDeviceService{devices: map[string]devicedomain.Device{}},
+		reg,
+		fakeConfigProvider{ok: true, cfg: model.RouterConfig{Host: "router.local"}},
+		&fakeRouterClient{membershipMap: map[string]bool{}},
+		nil,
+	)
+
+	result, err := engine.SetCapabilityState(context.Background(), automationdomain.CapabilityTargetRef{
+		Scope: automationdomain.ScopeGlobal,
+	}, "global.vpn_profile", "on")
+	if err != nil {
+		t.Fatalf("SetCapabilityState returned error: %v", err)
+	}
+	if !result.OK {
+		t.Fatalf("expected OK result")
+	}
+	if len(result.Warnings) != 0 {
+		t.Fatalf("expected no warnings, got %d", len(result.Warnings))
+	}
+	if action.execCalled != 1 {
+		t.Fatalf("expected action execution once, got %d", action.execCalled)
+	}
+
+	stored, err := repo.GetGlobalCapability(context.Background(), "global.vpn_profile")
+	if err != nil {
+		t.Fatalf("GetGlobalCapability returned error: %v", err)
+	}
+	if stored == nil {
+		t.Fatalf("expected persisted global state")
+	}
+	if stored.State != "on" || !stored.Enabled {
+		t.Fatalf("unexpected stored state: %+v", stored)
+	}
+}
+
+func TestEngineSyncOnceGlobalUpdatesState(t *testing.T) {
+	repo := newMemoryRepository()
+	source := &fakeStateSource{id: "test.source", value: true}
+	reg := registry.New()
+	reg.RegisterStateSource(source)
+
+	repo.templates["global.vpn_profile"] = automationdomain.CapabilityTemplate{
+		ID:           "global.vpn_profile",
+		Label:        "Global VPN profile",
+		Scope:        automationdomain.ScopeGlobal,
+		Control:      automationdomain.CapabilityControl{Type: automationdomain.ControlSwitch, Options: []automationdomain.CapabilityControlOption{{Value: "on", Label: "On"}, {Value: "off", Label: "Off"}}},
+		DefaultState: "off",
+		States: map[string]automationdomain.CapabilityStateConfig{
+			"on":  {Label: "On"},
+			"off": {Label: "Off"},
+		},
+		Sync: &automationdomain.CapabilitySyncConfig{
+			Enabled: true,
+			Source: automationdomain.CapabilitySyncSource{
+				TypeID: "test.source",
+				Params: map[string]any{},
+			},
+			Mapping: automationdomain.CapabilitySyncMapping{
+				WhenTrue:  "on",
+				WhenFalse: "off",
+			},
+			Mode:                 "external_truth",
+			TriggerActionsOnSync: false,
+		},
+	}
+	_ = repo.SaveGlobalCapability(context.Background(), &automationdomain.GlobalCapability{
+		CapabilityID: "global.vpn_profile",
+		Enabled:      true,
+		State:        "off",
+	})
+
+	engine := New(
+		repo,
+		&fakeDeviceService{devices: map[string]devicedomain.Device{}},
+		reg,
+		fakeConfigProvider{ok: true, cfg: model.RouterConfig{Host: "router.local"}},
+		&fakeRouterClient{membershipMap: map[string]bool{}},
+		nil,
+	)
+
+	if err := engine.SyncOnce(context.Background()); err != nil {
+		t.Fatalf("SyncOnce returned error: %v", err)
+	}
+
+	stored, err := repo.GetGlobalCapability(context.Background(), "global.vpn_profile")
+	if err != nil {
+		t.Fatalf("GetGlobalCapability returned error: %v", err)
+	}
+	if stored == nil {
+		t.Fatalf("expected persisted global state")
+	}
+	if stored.State != "on" {
+		t.Fatalf("expected synced state 'on', got %q", stored.State)
 	}
 }

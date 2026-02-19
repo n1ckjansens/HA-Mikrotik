@@ -44,11 +44,20 @@ export function AssignmentsPage() {
   const deviceCapabilitiesQuery = useDeviceCapabilities(selectedDeviceId || null);
   const updateDeviceCapability = useUpdateDeviceCapability();
 
-  const capabilities = useMemo(() => capabilitiesQuery.data ?? [], [capabilitiesQuery.data]);
+  const capabilities = useMemo(
+    () => (capabilitiesQuery.data ?? []).filter((item) => item.scope === "device"),
+    [capabilitiesQuery.data]
+  );
   const devices = useMemo(() => devicesQuery.data ?? [], [devicesQuery.data]);
 
   useEffect(() => {
-    if (!selectedCapabilityId && capabilities.length > 0) {
+    if (capabilities.length === 0) {
+      if (selectedCapabilityId) {
+        setSelectedCapabilityId("");
+      }
+      return;
+    }
+    if (!capabilities.some((item) => item.id === selectedCapabilityId)) {
       setSelectedCapabilityId(capabilities[0].id);
     }
   }, [capabilities, selectedCapabilityId]);

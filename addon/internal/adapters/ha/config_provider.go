@@ -13,7 +13,7 @@ type ConfigProvider interface {
 	Refresh(ctx context.Context) (bool, error)
 }
 
-// ManagerAdapter adapts legacy configsync manager to adapter contract.
+// ManagerAdapter adapts configsync manager to adapter contract.
 type ManagerAdapter struct {
 	manager *configsync.Manager
 }

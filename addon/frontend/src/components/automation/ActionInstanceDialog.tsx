@@ -21,14 +21,16 @@ import {
 import { Switch } from "@/components/ui/switch";
 import {
   defaultValueForActionField,
-  resolveVisibleFields
+  resolveVisibleFields,
+  scopeParamSchema
 } from "@/lib/automation";
-import type { ActionInstance, ActionType } from "@/types/automation";
+import type { ActionInstance, ActionType, CapabilityScope } from "@/types/automation";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   actionTypes: ActionType[];
+  scope: CapabilityScope;
   onSave: (action: ActionInstance) => void;
 };
 
@@ -39,7 +41,7 @@ function createActionID() {
   return `action_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function ActionInstanceDialog({ open, onOpenChange, actionTypes, onSave }: Props) {
+export function ActionInstanceDialog({ open, onOpenChange, actionTypes, scope, onSave }: Props) {
   const [selectedTypeId, setSelectedTypeId] = useState("");
   const [params, setParams] = useState<Record<string, unknown>>({});
 
@@ -48,9 +50,14 @@ export function ActionInstanceDialog({ open, onOpenChange, actionTypes, onSave }
     [actionTypes, selectedTypeId]
   );
 
+  const scopedParamSchema = useMemo(
+    () => scopeParamSchema(selectedType?.param_schema ?? [], scope),
+    [selectedType, scope]
+  );
+
   const visibleFields = useMemo(
-    () => resolveVisibleFields(selectedType?.param_schema ?? [], params),
-    [selectedType, params]
+    () => resolveVisibleFields(scopedParamSchema, params),
+    [scopedParamSchema, params]
   );
 
   const resetDialog = () => {
@@ -66,7 +73,7 @@ export function ActionInstanceDialog({ open, onOpenChange, actionTypes, onSave }
       return;
     }
     const defaults: Record<string, unknown> = {};
-    for (const field of type.param_schema) {
+    for (const field of scopeParamSchema(type.param_schema, scope)) {
       defaults[field.key] = defaultValueForActionField(field);
     }
     setParams(defaults);

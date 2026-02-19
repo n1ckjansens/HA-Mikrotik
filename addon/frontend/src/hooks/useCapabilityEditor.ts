@@ -26,7 +26,8 @@ export function useCapabilityEditor(capabilityId: string | null) {
     onSuccess: async (_created, template) => {
       await Promise.all([
         client.invalidateQueries({ queryKey: ["automation", "capabilities"] }),
-        client.invalidateQueries({ queryKey: queryKeys.automationCapabilityDetail(template.id) })
+        client.invalidateQueries({ queryKey: queryKeys.automationCapabilityDetail(template.id) }),
+        client.invalidateQueries({ queryKey: queryKeys.automationGlobalCapabilities })
       ]);
     }
   });
@@ -37,7 +38,8 @@ export function useCapabilityEditor(capabilityId: string | null) {
     onSuccess: async (_updated, vars) => {
       await Promise.all([
         client.invalidateQueries({ queryKey: ["automation", "capabilities"] }),
-        client.invalidateQueries({ queryKey: queryKeys.automationCapabilityDetail(vars.id) })
+        client.invalidateQueries({ queryKey: queryKeys.automationCapabilityDetail(vars.id) }),
+        client.invalidateQueries({ queryKey: queryKeys.automationGlobalCapabilities })
       ]);
     }
   });
@@ -45,7 +47,10 @@ export function useCapabilityEditor(capabilityId: string | null) {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCapability(id),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["automation", "capabilities"] });
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ["automation", "capabilities"] }),
+        client.invalidateQueries({ queryKey: queryKeys.automationGlobalCapabilities })
+      ]);
     }
   });
 

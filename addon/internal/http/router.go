@@ -43,6 +43,10 @@ func NewRouter(api *handlers.API) http.Handler {
 		apiRouter.Patch("/automation/capabilities/{id}/devices/{mac}", func(w http.ResponseWriter, r *http.Request) {
 			api.PatchCapabilityDevice(w, r, chi.URLParam(r, "id"), chi.URLParam(r, "mac"))
 		})
+		apiRouter.Get("/global/capabilities", api.ListGlobalCapabilities)
+		apiRouter.Patch("/global/capabilities/{capabilityId}", func(w http.ResponseWriter, r *http.Request) {
+			api.PatchGlobalCapability(w, r, chi.URLParam(r, "capabilityId"))
+		})
 
 		apiRouter.Get("/devices", api.ListDevices)
 		apiRouter.Get("/devices/{mac}/capabilities", func(w http.ResponseWriter, r *http.Request) {

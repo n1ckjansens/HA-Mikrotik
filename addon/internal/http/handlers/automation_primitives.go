@@ -27,6 +27,10 @@ func writeAutomationServiceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "capability_invalid", err.Error())
 	case errors.Is(err, automationdomain.ErrCapabilityStateInvalid):
 		writeError(w, http.StatusBadRequest, "capability_state_invalid", err.Error())
+	case errors.Is(err, automationdomain.ErrCapabilityScopeMismatch):
+		writeError(w, http.StatusBadRequest, "capability_scope_mismatch", err.Error())
+	case errors.Is(err, automationdomain.ErrCapabilityScopeInvalid):
+		writeError(w, http.StatusBadRequest, "capability_scope_invalid", err.Error())
 	case errors.Is(err, automationdomain.ErrDeviceNotFound):
 		writeError(w, http.StatusNotFound, "device_not_found", err.Error())
 	default:

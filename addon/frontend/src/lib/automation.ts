@@ -2,7 +2,8 @@ import type {
   CapabilityTemplate,
   ControlType,
   ActionType,
-  ActionParamField
+  ActionParamField,
+  CapabilityScope
 } from "@/types/automation";
 
 export function createEmptyCapabilityTemplate(): CapabilityTemplate {
@@ -11,6 +12,7 @@ export function createEmptyCapabilityTemplate(): CapabilityTemplate {
     label: "",
     description: "",
     category: "General",
+    scope: "device",
     control: {
       type: "switch",
       options: [
@@ -111,4 +113,39 @@ export function resolveVisibleFields(fields: ActionParamField[], params: Record<
 
 export function findActionType(actionTypes: ActionType[], typeId: string) {
   return actionTypes.find((item) => item.id === typeId);
+}
+
+export function scopeParamSchema(fields: ActionParamField[], scope: CapabilityScope) {
+  if (scope !== "global") {
+    return fields;
+  }
+  return fields.map((field) => {
+    if (field.kind !== "enum") {
+      return field;
+    }
+    return {
+      ...field,
+      options: (field.options ?? []).filter((option) => !isDeviceRef(option))
+    };
+  });
+}
+
+export function hasScopeViolationForGlobal(value: unknown): boolean {
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized.startsWith("device.") || normalized.includes("{{device.");
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => hasScopeViolationForGlobal(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some((item) =>
+      hasScopeViolationForGlobal(item)
+    );
+  }
+  return false;
+}
+
+function isDeviceRef(value: string) {
+  return value.trim().toLowerCase().startsWith("device.");
 }

@@ -43,9 +43,10 @@ func TestAddressListMembershipActionExecuteAdd(t *testing.T) {
 	action := NewAddressListMembershipAction()
 	ip := "192.168.88.10"
 	client := &fakeAddressListClient{}
+	device := model.DeviceView{MAC: "AA:BB:CC:DD:EE:01", LastIP: &ip}
 
 	err := action.Execute(context.Background(), automationdomain.ActionExecutionContext{
-		Device:       model.DeviceView{MAC: "AA:BB:CC:DD:EE:01", LastIP: &ip},
+		Target:       automationdomain.AutomationTarget{Scope: automationdomain.ScopeDevice, Device: &device},
 		RouterClient: client,
 		RouterConfig: model.RouterConfig{Host: "router.local"},
 	}, map[string]any{
@@ -66,9 +67,21 @@ func TestAddressListMembershipActionExecuteAdd(t *testing.T) {
 
 func TestAddressListMembershipActionValidateRejectsInvalidMode(t *testing.T) {
 	action := NewAddressListMembershipAction()
-	err := action.Validate(map[string]any{
+	err := action.Validate(automationdomain.AutomationTarget{Scope: automationdomain.ScopeDevice}, map[string]any{
 		"list":   "VPN_CLIENTS",
 		"mode":   "toggle",
+		"target": "device.ip",
+	})
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+}
+
+func TestAddressListMembershipActionValidateRejectsDeviceTargetForGlobalScope(t *testing.T) {
+	action := NewAddressListMembershipAction()
+	err := action.Validate(automationdomain.AutomationTarget{Scope: automationdomain.ScopeGlobal}, map[string]any{
+		"list":   "VPN_CLIENTS",
+		"mode":   "add",
 		"target": "device.ip",
 	})
 	if err == nil {

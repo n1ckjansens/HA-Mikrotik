@@ -15,6 +15,10 @@ var (
 	ErrDeviceNotFound = errors.New("device not found")
 	// ErrIntegrationNotConfigured means MikroTik/HA config is absent.
 	ErrIntegrationNotConfigured = errors.New("integration not configured")
+	// ErrCapabilityScopeMismatch means template scope and request target differ.
+	ErrCapabilityScopeMismatch = errors.New("capability scope mismatch")
+	// ErrCapabilityScopeInvalid means unsupported capability scope.
+	ErrCapabilityScopeInvalid = errors.New("capability scope invalid")
 	// ErrNotFound is generic repository-level missing row marker.
 	ErrNotFound = errors.New("not found")
 )

@@ -97,6 +97,11 @@ export async function fetchDeviceCapabilities(deviceId: string) {
   return capabilityUIModelsSchema.parse(raw);
 }
 
+export async function fetchGlobalCapabilities() {
+  const raw = await apiRequest<unknown>("/api/global/capabilities");
+  return capabilityUIModelsSchema.parse(raw);
+}
+
 export async function patchDeviceCapability(
   deviceId: string,
   capabilityId: string,
@@ -105,6 +110,21 @@ export async function patchDeviceCapability(
   const body = patchCapabilityPayloadSchema.parse(payload);
   const raw = await apiRequest<unknown>(
     `/api/devices/${encodeURIComponent(deviceId)}/capabilities/${encodeURIComponent(capabilityId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body)
+    }
+  );
+  return setStateResultSchema.parse(raw);
+}
+
+export async function patchGlobalCapability(
+  capabilityId: string,
+  payload: z.infer<typeof patchCapabilityPayloadSchema>
+) {
+  const body = patchCapabilityPayloadSchema.parse(payload);
+  const raw = await apiRequest<unknown>(
+    `/api/global/capabilities/${encodeURIComponent(capabilityId)}`,
     {
       method: "PATCH",
       body: JSON.stringify(body)

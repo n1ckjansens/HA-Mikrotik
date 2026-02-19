@@ -10,6 +10,7 @@ import { DevicesPage } from "@/pages/DevicesPage";
 import { AssignmentsPage } from "@/pages/automation/AssignmentsPage";
 import { CapabilitiesPage } from "@/pages/automation/CapabilitiesPage";
 import { CapabilityEditorPage } from "@/pages/automation/CapabilityEditorPage";
+import { GlobalCapabilitiesPage } from "@/pages/automation/GlobalCapabilitiesPage";
 import { PrimitivesPage } from "@/pages/automation/PrimitivesPage";
 
 import "./index.css";
@@ -28,6 +29,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/automation/capabilities" element={<CapabilitiesPage />} />
               <Route path="/automation/capabilities/new" element={<CapabilityEditorPage />} />
               <Route path="/automation/capabilities/:id" element={<CapabilityEditorPage />} />
+              <Route path="/automation/global" element={<GlobalCapabilitiesPage />} />
               <Route path="/automation/assignments" element={<AssignmentsPage />} />
               <Route path="/automation/primitives" element={<PrimitivesPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

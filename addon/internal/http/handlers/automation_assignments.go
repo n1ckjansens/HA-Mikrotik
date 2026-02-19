@@ -76,6 +76,35 @@ func (a *API) PatchCapabilityDevice(w http.ResponseWriter, r *http.Request, capa
 	writeJSON(w, http.StatusOK, result)
 }
 
+// ListGlobalCapabilities returns global capabilities controls.
+func (a *API) ListGlobalCapabilities(w http.ResponseWriter, r *http.Request) {
+	items, err := a.automation.GetGlobalCapabilities(r.Context())
+	if err != nil {
+		writeAutomationServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+// PatchGlobalCapability updates state/enabled for one global capability.
+func (a *API) PatchGlobalCapability(w http.ResponseWriter, r *http.Request, capabilityID string) {
+	payload, ok := decodePatchCapabilityPayload(w, r)
+	if !ok {
+		return
+	}
+	result, err := a.automation.PatchGlobalCapability(
+		r.Context(),
+		capabilityID,
+		payload.State,
+		payload.Enabled,
+	)
+	if err != nil {
+		writeAutomationServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func decodePatchCapabilityPayload(
 	w http.ResponseWriter,
 	r *http.Request,

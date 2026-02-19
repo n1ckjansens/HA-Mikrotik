@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const actionParamFieldKindSchema = z.enum(["string", "enum", "bool"]);
+export const capabilityScopeSchema = z.enum(["device", "global"]);
 
 export const visibleIfConditionSchema = z.object({
   key: z.string(),
@@ -85,6 +86,7 @@ export const capabilityTemplateSchema = z.object({
   label: z.string(),
   description: z.string(),
   category: z.string(),
+  scope: capabilityScopeSchema.optional().default("device"),
   control: capabilityControlSchema,
   states: z.record(capabilityStateConfigSchema),
   default_state: z.string(),
@@ -124,6 +126,7 @@ export const setStateResultSchema = z.object({
 export type ActionParamField = z.infer<typeof actionParamFieldSchema>;
 export type ActionType = z.infer<typeof actionTypeSchema>;
 export type StateSourceType = z.infer<typeof stateSourceTypeSchema>;
+export type CapabilityScope = z.infer<typeof capabilityScopeSchema>;
 export type ActionInstance = z.infer<typeof actionInstanceSchema>;
 export type CapabilityStateConfig = z.infer<typeof capabilityStateConfigSchema>;
 export type CapabilitySyncConfig = z.infer<typeof capabilitySyncConfigSchema>;

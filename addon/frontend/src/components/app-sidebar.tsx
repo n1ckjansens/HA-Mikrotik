@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { ChevronRight, Monitor, SlidersHorizontal, ToggleLeft, Workflow } from "lucide-react";
+import {
+  ChevronRight,
+  Monitor,
+  SlidersHorizontal,
+  Sparkles,
+  ToggleLeft,
+  Workflow
+} from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -21,6 +28,7 @@ import {
 
 const automationItems = [
   { to: "/automation/capabilities", label: "Capabilities", icon: SlidersHorizontal },
+  { to: "/automation/global", label: "Global", icon: Sparkles },
   { to: "/automation/assignments", label: "Assignments", icon: ToggleLeft },
   { to: "/automation/primitives", label: "Primitives", icon: Workflow }
 ];

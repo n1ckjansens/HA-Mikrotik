@@ -25,5 +25,6 @@ export const queryKeys = {
   automationCapabilityDetail: (capabilityId: string) =>
     ["automation", "capability", capabilityId] as const,
   automationAssignments: (capabilityId: string) =>
-    ["automation", "assignments", capabilityId] as const
+    ["automation", "assignments", capabilityId] as const,
+  automationGlobalCapabilities: ["automation", "global-capabilities"] as const
 };

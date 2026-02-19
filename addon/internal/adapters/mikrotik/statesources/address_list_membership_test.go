@@ -31,9 +31,10 @@ func TestAddressListMembershipSourceRead(t *testing.T) {
 	source := NewAddressListMembershipSource()
 	ip := "192.168.88.15"
 	client := &fakeStateClient{contains: true}
+	device := model.DeviceView{MAC: "AA:BB:CC:DD:EE:02", LastIP: &ip}
 
 	result, err := source.Read(context.Background(), automationdomain.StateSourceContext{
-		Device:       model.DeviceView{MAC: "AA:BB:CC:DD:EE:02", LastIP: &ip},
+		Target:       automationdomain.AutomationTarget{Scope: automationdomain.ScopeDevice, Device: &device},
 		RouterClient: client,
 		RouterConfig: model.RouterConfig{Host: "router.local"},
 	}, map[string]any{
@@ -58,11 +59,22 @@ func TestAddressListMembershipSourceRead(t *testing.T) {
 
 func TestAddressListMembershipSourceValidate(t *testing.T) {
 	source := NewAddressListMembershipSource()
-	err := source.Validate(map[string]any{
+	err := source.Validate(automationdomain.AutomationTarget{Scope: automationdomain.ScopeDevice}, map[string]any{
 		"list":   "VPN_CLIENTS",
 		"target": "literal_ip",
 	})
 	if err == nil {
 		t.Fatalf("expected validation error for missing literal_ip")
+	}
+}
+
+func TestAddressListMembershipSourceValidateRejectsDeviceTargetForGlobalScope(t *testing.T) {
+	source := NewAddressListMembershipSource()
+	err := source.Validate(automationdomain.AutomationTarget{Scope: automationdomain.ScopeGlobal}, map[string]any{
+		"list":   "VPN_CLIENTS",
+		"target": "device.mac",
+	})
+	if err == nil {
+		t.Fatalf("expected validation error")
 	}
 }

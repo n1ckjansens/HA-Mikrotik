@@ -1,6 +1,29 @@
 package automation
 
-import "time"
+import (
+	"strings"
+	"time"
+)
+
+// CapabilityScope defines where capability state is stored and executed.
+type CapabilityScope string
+
+const (
+	// ScopeDevice binds capability to a concrete device.
+	ScopeDevice CapabilityScope = "device"
+	// ScopeGlobal keeps one shared capability state for the whole system.
+	ScopeGlobal CapabilityScope = "global"
+)
+
+// NormalizeCapabilityScope applies backward-compatible default scope.
+func NormalizeCapabilityScope(scope CapabilityScope) CapabilityScope {
+	switch CapabilityScope(strings.TrimSpace(string(scope))) {
+	case ScopeGlobal:
+		return ScopeGlobal
+	default:
+		return ScopeDevice
+	}
+}
 
 // ControlType defines frontend UI control type for capability state changes.
 type ControlType string
@@ -101,6 +124,7 @@ type CapabilityTemplate struct {
 	Label        string                           `json:"label"`
 	Description  string                           `json:"description"`
 	Category     string                           `json:"category"`
+	Scope        CapabilityScope                  `json:"scope"`
 	Control      CapabilityControl                `json:"control"`
 	States       map[string]CapabilityStateConfig `json:"states"`
 	DefaultState string                           `json:"default_state"`
@@ -115,6 +139,13 @@ type DeviceCapability struct {
 	Enabled      bool      `json:"enabled"`
 	State        string    `json:"state"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// GlobalCapability stores global capability state.
+type GlobalCapability struct {
+	CapabilityID string `json:"capability_id"`
+	Enabled      bool   `json:"enabled"`
+	State        string `json:"state"`
 }
 
 // CapabilityControlDTO is UI-level control representation.

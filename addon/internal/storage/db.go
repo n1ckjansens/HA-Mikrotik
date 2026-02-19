@@ -101,6 +101,12 @@ func (r *Repository) migrate(ctx context.Context) error {
 			updated_at TEXT NOT NULL,
 			PRIMARY KEY (device_id, capability_id)
 		);`,
+		`CREATE TABLE IF NOT EXISTS global_capabilities_state (
+			capability_id TEXT PRIMARY KEY,
+			enabled BOOLEAN NOT NULL,
+			state TEXT NOT NULL,
+			updated_at DATETIME NOT NULL
+		);`,
 	}
 
 	for _, stmt := range statements {
@@ -120,10 +126,13 @@ func (r *Repository) migrate(ctx context.Context) error {
 	if _, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_device_cap_state_capability ON device_capabilities_state(capability_id);`); err != nil {
 		return err
 	}
+	if _, err := r.db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_global_cap_state_updated_at ON global_capabilities_state(updated_at);`); err != nil {
+		return err
+	}
 	if err := r.ensureStateColumns(ctx); err != nil {
 		return err
 	}
-	return r.normalizeLegacyMACKeys(ctx)
+	return r.normalizeMACKeys(ctx)
 }
 
 func (r *Repository) ensureStateColumns(ctx context.Context) error {
@@ -165,26 +174,26 @@ func isDuplicateColumnError(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "duplicate column name")
 }
 
-func (r *Repository) normalizeLegacyMACKeys(ctx context.Context) error {
+func (r *Repository) normalizeMACKeys(ctx context.Context) error {
 	tables := []string{"devices_registered", "devices_state", "devices_new_cache"}
 	for _, table := range tables {
 		updateStmt := "UPDATE OR IGNORE " + table + " SET mac = REPLACE(REPLACE(UPPER(TRIM(mac)), '%3A', ':'), '-', ':') " +
 			"WHERE mac LIKE '%3A%' OR mac LIKE '%3a%' OR mac LIKE '%-%' OR mac != UPPER(mac) OR mac != TRIM(mac);"
 		res, err := r.db.ExecContext(ctx, updateStmt)
 		if err != nil {
-			return fmt.Errorf("legacy mac normalization failed for %s: %w", table, err)
+			return fmt.Errorf("mac normalization failed for %s: %w", table, err)
 		}
 		if rows, _ := res.RowsAffected(); rows > 0 && r.logger != nil {
-			r.logger.Info("normalized legacy mac rows", "table", table, "rows", rows)
+			r.logger.Info("normalized mac rows", "table", table, "rows", rows)
 		}
 
 		deleteStmt := "DELETE FROM " + table + " WHERE mac LIKE '%3A%' OR mac LIKE '%3a%';"
 		res, err = r.db.ExecContext(ctx, deleteStmt)
 		if err != nil {
-			return fmt.Errorf("legacy mac cleanup failed for %s: %w", table, err)
+			return fmt.Errorf("mac cleanup failed for %s: %w", table, err)
 		}
 		if rows, _ := res.RowsAffected(); rows > 0 && r.logger != nil {
-			r.logger.Warn("removed conflicting legacy mac rows", "table", table, "rows", rows)
+			r.logger.Warn("removed conflicting mac rows", "table", table, "rows", rows)
 		}
 	}
 	return nil

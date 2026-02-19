@@ -5,27 +5,24 @@ import (
 	"database/sql"
 	"log/slog"
 
-	legacyautomationrepo "github.com/micro-ha/mikrotik-presence/addon/internal/automation/repository"
-	legacystorage "github.com/micro-ha/mikrotik-presence/addon/internal/storage"
+	"github.com/micro-ha/mikrotik-presence/addon/internal/storage"
 )
 
 // DB is root sqlite storage handle for repositories.
 type DB struct {
-	storage        *legacystorage.Repository
-	automationRepo *legacyautomationrepo.Repository
-	logger         *slog.Logger
+	storage *storage.Repository
+	logger  *slog.Logger
 }
 
 // Open initializes sqlite database and runs migrations.
 func Open(ctx context.Context, dbPath string, logger *slog.Logger) (*DB, error) {
-	base, err := legacystorage.New(ctx, dbPath, logger)
+	base, err := storage.New(ctx, dbPath, logger)
 	if err != nil {
 		return nil, err
 	}
 	return &DB{
-		storage:        base,
-		automationRepo: legacyautomationrepo.New(base.SQLDB(), logger),
-		logger:         logger,
+		storage: base,
+		logger:  logger,
 	}, nil
 }
 

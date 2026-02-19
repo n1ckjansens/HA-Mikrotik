@@ -8,6 +8,12 @@ import (
 	"github.com/micro-ha/mikrotik-presence/addon/internal/model"
 )
 
+// AutomationTarget identifies runtime scope for action/state-source execution.
+type AutomationTarget struct {
+	Scope  CapabilityScope
+	Device *devicedomain.Device
+}
+
 // AddressListClient is required by MikroTik address-list related actions.
 type AddressListClient interface {
 	AddAddressListEntry(ctx context.Context, cfg model.RouterConfig, list, address string) error
@@ -16,7 +22,7 @@ type AddressListClient interface {
 
 // ActionExecutionContext contains runtime dependencies for action execution.
 type ActionExecutionContext struct {
-	Device       devicedomain.Device
+	Target       AutomationTarget
 	RouterClient AddressListClient
 	RouterConfig model.RouterConfig
 	Logger       *slog.Logger
@@ -34,6 +40,6 @@ type ActionMetadata struct {
 type Action interface {
 	ID() string
 	Metadata() ActionMetadata
-	Validate(params map[string]any) error
+	Validate(target AutomationTarget, params map[string]any) error
 	Execute(ctx context.Context, execCtx ActionExecutionContext, params map[string]any) error
 }

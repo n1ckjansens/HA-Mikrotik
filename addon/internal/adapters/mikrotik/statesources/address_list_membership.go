@@ -61,22 +61,33 @@ func (s *AddressListMembershipSource) Metadata() automationdomain.StateSourceMet
 }
 
 // Validate validates state-source params against schema.
-func (s *AddressListMembershipSource) Validate(params map[string]any) error {
+func (s *AddressListMembershipSource) Validate(
+	target automationdomain.AutomationTarget,
+	params map[string]any,
+) error {
 	if _, err := stringParam(params, "list"); err != nil {
 		return err
 	}
-	target, err := stringParam(params, "target")
+	targetParam, err := stringParam(params, "target")
 	if err != nil {
 		return err
 	}
-	switch target {
+	scope := automationdomain.NormalizeCapabilityScope(target.Scope)
+	switch targetParam {
 	case "device.ip", "device.mac":
+		if scope == automationdomain.ScopeGlobal {
+			return fmt.Errorf("target %q is not available for global scope", targetParam)
+		}
 	case "literal_ip":
-		if _, err := stringParam(params, "literal_ip"); err != nil {
+		literalIP, err := stringParam(params, "literal_ip")
+		if err != nil {
 			return err
 		}
+		if scope == automationdomain.ScopeGlobal && containsDevicePlaceholder(literalIP) {
+			return fmt.Errorf("global scope does not support device placeholders")
+		}
 	default:
-		return fmt.Errorf("unsupported target %q", target)
+		return fmt.Errorf("unsupported target %q", targetParam)
 	}
 	return nil
 }
@@ -87,7 +98,7 @@ func (s *AddressListMembershipSource) Read(
 	sourceCtx automationdomain.StateSourceContext,
 	params map[string]any,
 ) (any, error) {
-	if err := s.Validate(params); err != nil {
+	if err := s.Validate(sourceCtx.Target, params); err != nil {
 		return nil, err
 	}
 	if sourceCtx.RouterClient == nil {
@@ -120,15 +131,15 @@ func resolveTargetAddress(
 ) (string, error) {
 	switch target {
 	case "device.ip":
-		if sourceCtx.Device.LastIP == nil || strings.TrimSpace(*sourceCtx.Device.LastIP) == "" {
+		if sourceCtx.Target.Device == nil || sourceCtx.Target.Device.LastIP == nil || strings.TrimSpace(*sourceCtx.Target.Device.LastIP) == "" {
 			return "", fmt.Errorf("device IP is empty")
 		}
-		return strings.TrimSpace(*sourceCtx.Device.LastIP), nil
+		return strings.TrimSpace(*sourceCtx.Target.Device.LastIP), nil
 	case "device.mac":
-		if strings.TrimSpace(sourceCtx.Device.MAC) == "" {
+		if sourceCtx.Target.Device == nil || strings.TrimSpace(sourceCtx.Target.Device.MAC) == "" {
 			return "", fmt.Errorf("device MAC is empty")
 		}
-		return sourceCtx.Device.MAC, nil
+		return sourceCtx.Target.Device.MAC, nil
 	case "literal_ip":
 		value, err := stringParam(params, "literal_ip")
 		if err != nil {
@@ -138,6 +149,10 @@ func resolveTargetAddress(
 	default:
 		return "", fmt.Errorf("unsupported target %q", target)
 	}
+}
+
+func containsDevicePlaceholder(raw string) bool {
+	return strings.Contains(strings.ToLower(raw), "{{device.")
 }
 
 func stringParam(params map[string]any, key string) (string, error) {
