@@ -1,6 +1,6 @@
 {
   "name": "MikroTik Presence",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "slug": "mikrotik_presence",
   "description": "MikroTik RouterOS v7 device presence monitor",
   "url": "https://github.com/example/mikrotik-presence",
@@ -12,10 +12,22 @@
   "ingress_port": 8099,
   "panel_icon": "mdi:router-wireless",
   "panel_title": "MikroTik Presence",
-  "hassio_api": true,
-  "homeassistant_api": true,
-  "options": {},
-  "schema": {},
+  "options": {
+    "router_host": "",
+    "router_username": "",
+    "router_password": "",
+    "router_ssl": false,
+    "router_verify_tls": false,
+    "poll_interval_sec": 5
+  },
+  "schema": {
+    "router_host": "str",
+    "router_username": "str",
+    "router_password": "password",
+    "router_ssl": "bool",
+    "router_verify_tls": "bool",
+    "poll_interval_sec": "int(5,300)"
+  },
   "ports": {
     "8099/tcp": null
   },

@@ -18,7 +18,7 @@ This guide explains how to run MikroTik Presence locally without Home Assistant,
 cp env.dev.example .env.dev
 ```
 
-2. Start full dev stack (backend + frontend + mock HA + mock RouterOS):
+2. Start full dev stack (backend + frontend + mock RouterOS):
 
 ```bash
 make dev-up-d
@@ -49,8 +49,6 @@ make dev-down
 
 ## Real RouterOS Mode
 
-Use same stack, but point mock-HA config to your real router.
-
 1. Edit `.env.dev`:
 
 ```bash
@@ -62,10 +60,10 @@ ROUTER_VERIFY_TLS=false
 ROUTER_POLL_INTERVAL_SEC=5
 ```
 
-2. Start stack:
+2. Recreate backend after env update:
 
 ```bash
-make dev-up-d
+docker compose -f docker-compose.dev.yml up -d --force-recreate backend
 ```
 
 3. Trigger immediate refresh and inspect devices:
@@ -73,21 +71,6 @@ make dev-up-d
 ```bash
 curl -fsS -X POST http://localhost:8099/api/refresh -H 'Content-Type: application/json' -d '{}'
 curl -fsS http://localhost:8099/api/devices
-```
-
-### Важно про `.env.dev`
-
-Параметры `ROUTER_*` читаются контейнером `mock-ha` при старте.
-Если вы поменяли `.env.dev`, пересоздайте `mock-ha` и `backend`:
-
-```bash
-docker compose -f docker-compose.dev.yml up -d --force-recreate mock-ha backend
-```
-
-Проверить, какой роутер реально отдается backend:
-
-```bash
-curl -fsS http://127.0.0.1:8123/api/mikrotik_presence/config
 ```
 
 ## Hot Reload
@@ -119,14 +102,6 @@ Direct endpoint:
 curl "http://127.0.0.1:18080/admin/scenario?state=offline"
 ```
 
-Mock HA config patch (increments config version):
-
-```bash
-curl -X POST http://127.0.0.1:8123/admin/config \
-  -H 'Content-Type: application/json' \
-  -d '{"poll_interval_sec":10}'
-```
-
 ## Useful Endpoints
 
 - `GET /healthz`
@@ -146,7 +121,7 @@ Backend:
 cd addon
 go mod tidy
 go test ./... -race
-HTTP_ADDR=:8099 DB_PATH=/tmp/mikrotik_presence.db HA_BASE_URL=http://127.0.0.1:8123 SUPERVISOR_TOKEN= go run ./cmd/server
+HTTP_ADDR=:8099 DB_PATH=/tmp/mikrotik_presence.db ROUTER_HOST=127.0.0.1:18080 ROUTER_USERNAME=admin ROUTER_PASSWORD=admin ROUTER_SSL=false ROUTER_VERIFY_TLS=false ROUTER_POLL_INTERVAL_SEC=5 go run ./cmd/server
 ```
 
 Frontend:

@@ -1,0 +1,22 @@
+configuration:
+  router_host:
+    name: Router host
+    description: RouterOS hostname, IP, or URL.
+  router_username:
+    name: Router username
+    description: RouterOS username with REST API access.
+  router_password:
+    name: Router password
+    description: RouterOS password.
+  router_ssl:
+    name: Use SSL
+    description: Enable HTTPS for RouterOS REST API.
+  router_verify_tls:
+    name: Verify TLS certificate
+    description: Verify RouterOS TLS certificate when SSL is enabled.
+  poll_interval_sec:
+    name: Poll interval (seconds)
+    description: Device poll interval. Minimum is 5 seconds.
+
+network:
+  8099/tcp: HTTP API / Ingress web UI

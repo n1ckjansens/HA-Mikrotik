@@ -13,8 +13,10 @@ var (
 	ErrCapabilityStateInvalid = errors.New("capability state invalid")
 	// ErrDeviceNotFound means target device is missing.
 	ErrDeviceNotFound = errors.New("device not found")
-	// ErrIntegrationNotConfigured means MikroTik/HA config is absent.
-	ErrIntegrationNotConfigured = errors.New("integration not configured")
+	// ErrAddonNotConfigured means MikroTik config in add-on options is absent.
+	ErrAddonNotConfigured = errors.New("addon not configured")
+	// ErrIntegrationNotConfigured is kept as a backwards-compatible alias.
+	ErrIntegrationNotConfigured = ErrAddonNotConfigured
 	// ErrCapabilityScopeMismatch means template scope and request target differ.
 	ErrCapabilityScopeMismatch = errors.New("capability scope mismatch")
 	// ErrCapabilityScopeInvalid means unsupported capability scope.

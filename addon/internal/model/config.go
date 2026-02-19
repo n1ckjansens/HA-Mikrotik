@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// RouterConfig represents a normalized integration configuration payload.
+// RouterConfig represents normalized router configuration from add-on options.
 type RouterConfig struct {
 	Version         int64     `json:"version"`
 	UpdatedAt       time.Time `json:"updated_at"`

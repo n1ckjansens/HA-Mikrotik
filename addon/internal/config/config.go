@@ -14,8 +14,9 @@ const (
 	defaultHTTPAddr               = ":8099"
 	defaultDBPath                 = "/data/mikrotik_presence.db"
 	defaultFrontendDist           = "/app/frontend/dist"
-	defaultHABaseURL              = "http://supervisor/core"
+	defaultAddonOptionsPath       = "/data/options.json"
 	defaultAutomationSyncInterval = 20 * time.Second
+	defaultConfigRefreshInterval  = 20 * time.Second
 )
 
 // Config stores runtime settings loaded from environment variables.
@@ -23,8 +24,8 @@ type Config struct {
 	HTTPAddr               string
 	DBPath                 string
 	FrontendDist           string
-	HABaseURL              string
-	SupervisorToken        string
+	AddonOptionsPath       string
+	ConfigRefreshInterval  time.Duration
 	LogLevel               slog.Level
 	AutomationSyncInterval time.Duration
 	PresenceThresholds     model.PresenceThresholds
@@ -36,8 +37,8 @@ func Load() Config {
 		HTTPAddr:               getenv("HTTP_ADDR", defaultHTTPAddr),
 		DBPath:                 getenv("DB_PATH", defaultDBPath),
 		FrontendDist:           getenv("FRONTEND_DIST", defaultFrontendDist),
-		HABaseURL:              getenv("HA_BASE_URL", defaultHABaseURL),
-		SupervisorToken:        strings.TrimSpace(os.Getenv("SUPERVISOR_TOKEN")),
+		AddonOptionsPath:       getenv("ADDON_OPTIONS_PATH", defaultAddonOptionsPath),
+		ConfigRefreshInterval:  parseDuration("CONFIG_REFRESH_INTERVAL", defaultConfigRefreshInterval),
 		LogLevel:               parseLogLevel(getenv("LOG_LEVEL", "info")),
 		AutomationSyncInterval: parseDuration("AUTOMATION_SYNC_INTERVAL", defaultAutomationSyncInterval),
 		PresenceThresholds: model.PresenceThresholds{

@@ -44,8 +44,8 @@ func (p *Poller) Run(ctx context.Context) {
 		case <-timer.C:
 		}
 		if err := p.service.PollOnce(ctx); err != nil {
-			if errors.Is(err, devicedomain.ErrIntegrationNotConfigured) {
-				p.logger.Info("poll skipped; integration not configured")
+			if errors.Is(err, devicedomain.ErrAddonNotConfigured) {
+				p.logger.Info("poll skipped; add-on is not configured")
 				continue
 			}
 			p.logger.Error("poll failed", "err", err)

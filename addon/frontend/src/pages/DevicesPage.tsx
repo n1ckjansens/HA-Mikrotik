@@ -18,8 +18,8 @@ import { DevicesTable } from "@/components/devices/DevicesTable";
 import { KpiFilters } from "@/components/devices/KpiFilters";
 import { OverviewHeader } from "@/components/devices/OverviewHeader";
 import {
+  AddonConfigurationRequiredState,
   DisconnectedState,
-  IntegrationRequiredState,
   NoDevicesState,
   NoResultsState
 } from "@/components/devices/SystemStates";
@@ -158,14 +158,14 @@ export function DevicesPage() {
     );
   }, [isMobile]);
 
-  const integrationNotConfigured =
+  const addonNotConfigured =
     devicesQuery.error instanceof ApiError &&
-    devicesQuery.error.code === "integration_not_configured";
+    devicesQuery.error.code === "addon_not_configured";
   const isInitialLoading = devicesQuery.isPending && !devicesQuery.data;
   const lastSuccessfulAt =
     devicesQuery.dataUpdatedAt > 0 ? devicesQuery.dataUpdatedAt : undefined;
 
-  const routerDisconnected = Boolean(devicesQuery.error) && !integrationNotConfigured;
+  const routerDisconnected = Boolean(devicesQuery.error) && !addonNotConfigured;
   const routerMessage =
     devicesQuery.error instanceof Error
       ? devicesQuery.error.message
@@ -363,7 +363,7 @@ export function DevicesPage() {
     }));
   };
 
-  if (integrationNotConfigured) {
+  if (addonNotConfigured) {
     return (
       <AppShell
         header={
@@ -381,7 +381,7 @@ export function DevicesPage() {
           />
         }
       >
-        <IntegrationRequiredState />
+        <AddonConfigurationRequiredState />
       </AppShell>
     );
   }

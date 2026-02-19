@@ -18,7 +18,7 @@ type Poller interface {
 	TriggerRefresh()
 }
 
-// ConfigProvider exposes current integration status.
+// ConfigProvider exposes current add-on router config status.
 type ConfigProvider interface {
 	Get() (model.RouterConfig, bool)
 }
@@ -57,7 +57,7 @@ func (a *API) Logger() *slog.Logger {
 	return a.logger
 }
 
-// Health reports service liveness and integration status.
+// Health reports service liveness and router config status.
 func (a *API) Health(w http.ResponseWriter, _ *http.Request) {
 	_, configured := a.config.Get()
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "configured": configured})

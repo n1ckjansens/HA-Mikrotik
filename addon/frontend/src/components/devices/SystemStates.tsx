@@ -4,27 +4,20 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-export function IntegrationRequiredState() {
+export function AddonConfigurationRequiredState() {
   return (
     <Card>
       <CardContent className="space-y-4 p-6">
         <div className="flex items-start gap-2">
           <Router className="mt-0.5 h-4 w-4 text-muted-foreground" />
           <div>
-            <p className="font-medium">Integration not configured</p>
+            <p className="font-medium">Add-on is not configured</p>
             <p className="text-sm text-muted-foreground">
-              Configure MikroTik Presence in Home Assistant Devices & Services.
+              Open Settings {" > "}Add-ons {" > "}MikroTik Presence {" > "}
+              Configuration and set router credentials.
             </p>
           </div>
         </div>
-
-        <Button
-          onClick={() => {
-            window.open("/config/integrations", "_blank", "noopener,noreferrer");
-          }}
-        >
-          Configure Integration
-        </Button>
       </CardContent>
     </Card>
   );

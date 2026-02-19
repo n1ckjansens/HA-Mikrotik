@@ -34,7 +34,7 @@ func (d *DB) Close() error {
 	return d.storage.Close()
 }
 
-// SQLDB returns low-level sql.DB for integrations requiring direct access.
+// SQLDB returns low-level sql.DB for callers requiring direct access.
 func (d *DB) SQLDB() *sql.DB {
 	if d == nil || d.storage == nil {
 		return nil

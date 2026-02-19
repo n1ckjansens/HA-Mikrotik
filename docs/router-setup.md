@@ -1,6 +1,6 @@
 # Настройка MikroTik RouterOS v7 для MikroTik Presence
 
-Эта инструкция готовит роутер для интеграции с `MikroTik Presence` (Home Assistant + Add-on).
+Эта инструкция готовит роутер для `MikroTik Presence` Home Assistant add-on.
 
 ## Что важно заранее
 
@@ -105,14 +105,14 @@ curl -k -u ha_presence:CHANGE_ME_STRONG_PASSWORD https://192.168.88.1/rest/ip/ar
 curl -k -u ha_presence:CHANGE_ME_STRONG_PASSWORD https://192.168.88.1/rest/ip/address
 ```
 
-## 6) Заполнить Config Flow в Home Assistant
+## 6) Заполнить конфигурацию add-on в Home Assistant
 
-- `host`: `192.168.88.1` (или DNS имя)
-- `username`: `ha_presence`
-- `password`: ваш пароль
-- `ssl`: `true` для `www-ssl`, `false` для `www`
-- `verify_tls`: `true`, если сертификат доверенный в HA; иначе `false`
-- `poll interval`: 5-10 секунд (минимум 5)
+- `router_host`: `192.168.88.1` (или DNS имя/URL)
+- `router_username`: `ha_presence`
+- `router_password`: ваш пароль
+- `router_ssl`: `true` для `www-ssl`, `false` для `www`
+- `router_verify_tls`: `true`, если сертификат доверенный в HA; иначе `false`
+- `poll_interval_sec`: 5-10 секунд (минимум 5)
 
 ## 7) Типовые проблемы
 
@@ -140,7 +140,7 @@ curl -k -u ha_presence:CHANGE_ME_STRONG_PASSWORD https://192.168.88.1/rest/ip/ad
 ### TLS certificate verify failed
 
 - Self-signed сертификат без доверия в HA.
-- Временно поставьте `verify_tls=false` в Config Flow.
+- Временно поставьте `router_verify_tls=false` в конфигурации add-on.
 
 ### Wi-Fi таблица пустая
 

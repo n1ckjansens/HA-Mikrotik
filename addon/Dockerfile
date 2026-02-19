@@ -22,7 +22,7 @@ COPY --from=frontend-builder /frontend/dist /app/frontend/dist
 
 ENV HTTP_ADDR=:8099
 ENV DB_PATH=/data/mikrotik_presence.db
-ENV HA_BASE_URL=http://supervisor/core
+ENV ADDON_OPTIONS_PATH=/data/options.json
 ENV FRONTEND_DIST=/app/frontend/dist
 
 CMD ["/usr/local/bin/mikrotik-presence"]

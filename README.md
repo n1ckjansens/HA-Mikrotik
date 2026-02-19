@@ -2,19 +2,15 @@
 
 MikroTik Presence is a single Home Assistant product:
 - Home Assistant Add-on with Ingress Web UI
-- Home Assistant Custom Integration (Config Flow)
 
-Users install it as one solution:
+Installation flow:
 1. Add this repository in Home Assistant Add-on Store.
 2. Install **MikroTik Presence** add-on.
-3. Add **MikroTik Presence** integration in **Devices & Services**.
-4. Open add-on UI. Devices start syncing automatically.
-
-No duplicate manual configuration is required in the add-on.
+3. Open add-on **Configuration** tab and fill router settings.
+4. Start add-on and open the UI.
 
 ## Repository Structure
 
-- `custom_components/mikrotik_presence/` - integration with config flow and internal API endpoint.
 - `addon/` - Go backend, SQLite persistence, RouterOS poller, ingress server.
 - `addon/frontend/` - React/Vite/TypeScript UI with shadcn/ui.
 
@@ -36,15 +32,14 @@ No duplicate manual configuration is required in the add-on.
 - `new` vs `registered` status.
 - Persistent SQLite data in `/data`.
 - Register and edit devices from UI.
-- Polling interval configurable in integration (minimum 5s).
-- Config sync from Integration to Add-on using Home Assistant API.
+- Polling interval configurable in add-on options (minimum 5s).
 
 ## Development
 
 Full local development (Docker Compose, mock/real RouterOS, smoke tests, hot reload):
 
 - `docs/development.md`
-- `docs/router-setup.md` (подготовка RouterOS v7 под интеграцию)
+- `docs/router-setup.md` (подготовка RouterOS v7 под add-on)
 
 ### Backend checks
 

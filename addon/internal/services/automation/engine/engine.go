@@ -23,7 +23,7 @@ type DeviceService interface {
 	ListDevices(ctx context.Context, filter devicedomain.ListFilter) ([]devicedomain.Device, error)
 }
 
-// RouterConfigProvider exposes current integration config.
+// RouterConfigProvider exposes current add-on router config.
 type RouterConfigProvider interface {
 	Get() (model.RouterConfig, bool)
 }
@@ -137,7 +137,7 @@ func (e *Engine) SetCapabilityState(
 func (e *Engine) SyncOnce(ctx context.Context) error {
 	routerConfig, configured := e.config.Get()
 	if !configured {
-		return automationdomain.ErrIntegrationNotConfigured
+		return automationdomain.ErrAddonNotConfigured
 	}
 
 	templates, err := e.repo.ListTemplates(ctx, "", "")
@@ -383,7 +383,7 @@ func (e *Engine) executeStateActions(
 		if !configured {
 			warnings = append(warnings, warningForAction(
 				actionInstance,
-				"router integration is not configured",
+				"router is not configured in add-on options",
 			))
 			continue
 		}

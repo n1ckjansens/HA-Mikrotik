@@ -13,7 +13,7 @@ import (
 // ListDevices returns current device list.
 func (a *API) ListDevices(w http.ResponseWriter, r *http.Request) {
 	if _, ok := a.config.Get(); !ok {
-		writeError(w, http.StatusConflict, "integration_not_configured", "Integration not configured")
+		writeError(w, http.StatusConflict, "addon_not_configured", "Add-on is not configured")
 		return
 	}
 	filter := devicedomain.ListFilter{

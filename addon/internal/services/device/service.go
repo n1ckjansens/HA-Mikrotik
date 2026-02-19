@@ -21,7 +21,7 @@ type RouterClient interface {
 	FetchSnapshot(ctx context.Context, cfg model.RouterConfig) (*routeros.Snapshot, error)
 }
 
-// RouterConfigProvider supplies current integration config.
+// RouterConfigProvider supplies current add-on router config.
 type RouterConfigProvider interface {
 	Get() (model.RouterConfig, bool)
 }
@@ -70,7 +70,7 @@ func NewWithThresholds(
 func (s *Service) PollOnce(ctx context.Context) error {
 	cfg, ok := s.config.Get()
 	if !ok {
-		return devicedomain.ErrIntegrationNotConfigured
+		return devicedomain.ErrAddonNotConfigured
 	}
 
 	snapshot, err := s.router.FetchSnapshot(ctx, cfg)
