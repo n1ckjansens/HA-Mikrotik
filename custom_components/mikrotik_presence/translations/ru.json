@@ -4,10 +4,9 @@
     "step": {
       "user": {
         "title": "Выберите способ настройки",
-        "description": "Используйте обнаружение add-on в Home Assistant или настройте URL backend вручную.",
+        "description": "Используйте режим add-on через Home Assistant Supervisor или настройте URL backend вручную.",
         "menu_options": {
-          "addon": "Использовать установленный add-on",
-          "addon_install": "Установить и запустить add-on",
+          "addon": "Использовать Supervisor add-on",
           "manual": "Настроить вручную"
         }
       },
@@ -21,18 +20,13 @@
       }
     },
     "error": {
-      "cannot_connect": "Не удалось подключиться к backend",
-      "invalid_auth": "Неверная аутентификация",
-      "unknown": "Неожиданная ошибка"
+      "cannot_connect": "Не удалось подключиться к backend"
     },
     "abort": {
       "already_configured": "Этот backend уже настроен",
       "not_our_addon": "Событие обнаружения относится к другому add-on",
-      "invalid_discovery": "Данные обнаружения некорректны",
       "no_supervisor": "Для действий с add-on требуется Home Assistant Supervisor",
-      "addon_not_installed": "Add-on MikroTik Presence не установлен",
-      "addon_operation_failed": "Не удалось установить или запустить add-on",
-      "cannot_connect": "Не удалось подключиться к backend"
+      "addon_not_available": "Add-on MikroTik Presence недоступен в Supervisor Store"
     }
   },
   "options": {
@@ -46,9 +40,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Не удалось подключиться к backend",
-      "invalid_auth": "Неверная аутентификация",
-      "unknown": "Неожиданная ошибка"
+      "cannot_connect": "Не удалось подключиться к backend"
     }
   }
 }

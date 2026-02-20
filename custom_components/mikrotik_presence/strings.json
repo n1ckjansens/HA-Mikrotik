@@ -4,10 +4,9 @@
     "step": {
       "user": {
         "title": "Choose setup method",
-        "description": "Use Home Assistant add-on discovery or configure backend URL manually.",
+        "description": "Use Home Assistant Supervisor add-on mode or configure backend URL manually.",
         "menu_options": {
-          "addon": "Use installed add-on",
-          "addon_install": "Install and start add-on",
+          "addon": "Use Supervisor add-on",
           "manual": "Configure manually"
         }
       },
@@ -21,18 +20,13 @@
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect to backend",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Cannot connect to backend"
     },
     "abort": {
       "already_configured": "This backend is already configured",
       "not_our_addon": "Discovery event is for another add-on",
-      "invalid_discovery": "Discovery data is invalid",
       "no_supervisor": "Home Assistant Supervisor is required for add-on actions",
-      "addon_not_installed": "MikroTik Presence add-on is not installed",
-      "addon_operation_failed": "Failed to install or start add-on",
-      "cannot_connect": "Cannot connect to backend"
+      "addon_not_available": "MikroTik Presence add-on is not available in Supervisor Store"
     }
   },
   "options": {
@@ -46,9 +40,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect to backend",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Cannot connect to backend"
     }
   }
 }
