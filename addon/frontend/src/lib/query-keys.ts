@@ -7,8 +7,6 @@ type DevicesListQueryParams = {
   vendors: string[];
   sources: string[];
   subnets: string[];
-  pageIndex: number;
-  pageSize: number;
 };
 
 export const queryKeys = {

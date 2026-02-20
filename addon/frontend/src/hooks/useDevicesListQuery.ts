@@ -74,8 +74,6 @@ type UseDevicesListQueryParams = {
   vendors: string[];
   sources: string[];
   subnets: string[];
-  pageIndex: number;
-  pageSize: number;
 };
 
 export function useDevicesListQuery({
@@ -84,9 +82,7 @@ export function useDevicesListQuery({
   segmentation,
   vendors,
   sources,
-  subnets,
-  pageIndex,
-  pageSize
+  subnets
 }: UseDevicesListQueryParams) {
   const status = segmentation === "new" || segmentation === "registered" ? segmentation : "all";
   const normalizedQuery = query.trim();
@@ -98,9 +94,7 @@ export function useDevicesListQuery({
       segmentation,
       vendors: [...vendors].sort((a, b) => a.localeCompare(b)),
       sources: [...sources].sort((a, b) => a.localeCompare(b)),
-      subnets: [...subnets].sort((a, b) => a.localeCompare(b)),
-      pageIndex,
-      pageSize
+      subnets: [...subnets].sort((a, b) => a.localeCompare(b))
     }),
     queryFn: () =>
       fetchDevices({

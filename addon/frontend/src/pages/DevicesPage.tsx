@@ -111,9 +111,7 @@ export function DevicesPage() {
     segmentation,
     vendors: facets.vendors,
     sources: facets.sources,
-    subnets: facets.subnets,
-    pageIndex: pagination.pageIndex,
-    pageSize: pagination.pageSize
+    subnets: facets.subnets
   });
 
   useEffect(() => {
@@ -133,17 +131,6 @@ export function DevicesPage() {
       }
     };
   }, []);
-
-  useEffect(() => {
-    setPagination((current) => ({ ...current, pageIndex: 0 }));
-  }, [
-    debouncedQuery,
-    segmentation,
-    onlineScope,
-    facets.vendors,
-    facets.sources,
-    facets.subnets
-  ]);
 
   useEffect(() => {
     setColumnVisibility(
@@ -230,6 +217,53 @@ export function DevicesPage() {
     [devices, segmentation, onlineScope, debouncedQuery, facets]
   );
 
+  const paginationResetKey = useMemo(() => {
+    const normalized = {
+      query: debouncedQuery.trim(),
+      segmentation,
+      onlineScope,
+      vendors: [...facets.vendors].sort((a, b) => a.localeCompare(b)),
+      sources: [...facets.sources].sort((a, b) => a.localeCompare(b)),
+      subnets: [...facets.subnets].sort((a, b) => a.localeCompare(b))
+    };
+    return JSON.stringify(normalized);
+  }, [
+    debouncedQuery,
+    segmentation,
+    onlineScope,
+    facets.vendors,
+    facets.sources,
+    facets.subnets
+  ]);
+
+  const previousPaginationResetKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (previousPaginationResetKeyRef.current === null) {
+      previousPaginationResetKeyRef.current = paginationResetKey;
+      return;
+    }
+    if (previousPaginationResetKeyRef.current === paginationResetKey) {
+      return;
+    }
+
+    previousPaginationResetKeyRef.current = paginationResetKey;
+    setPagination((current) =>
+      current.pageIndex === 0 ? current : { ...current, pageIndex: 0 }
+    );
+  }, [paginationResetKey]);
+
+  useEffect(() => {
+    const nextPageCount = Math.max(1, Math.ceil(filteredDevices.length / pagination.pageSize));
+    const maxPageIndex = nextPageCount - 1;
+    if (pagination.pageIndex <= maxPageIndex) {
+      return;
+    }
+    setPagination((current) => ({
+      ...current,
+      pageIndex: maxPageIndex
+    }));
+  }, [filteredDevices.length, pagination.pageIndex, pagination.pageSize]);
+
   const selectedFromList = useMemo(
     () => devices.find((device) => device.mac === selectedMac) ?? null,
     [devices, selectedMac]
@@ -267,6 +301,7 @@ export function DevicesPage() {
       columnVisibility,
       pagination
     },
+    autoResetPageIndex: false,
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,

@@ -3,6 +3,7 @@ import { Copy } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 
 type CopyValueProps = {
@@ -26,14 +27,14 @@ export function CopyValue({
 
   const handleClick = async (event: MouseEvent<HTMLButtonElement>) => {
     onClick?.(event);
-    if (event.defaultPrevented || !normalized) {
+    if (!normalized) {
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(normalized);
+    const copied = await copyTextToClipboard(normalized);
+    if (copied) {
       toast.success(`${label} copied`);
-    } catch {
+    } else {
       toast.error(`Unable to copy ${label.toLowerCase()}`);
     }
   };

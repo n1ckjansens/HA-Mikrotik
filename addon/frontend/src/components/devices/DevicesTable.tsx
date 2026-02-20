@@ -4,9 +4,16 @@ import {
   type Row as TanStackRow,
   type Table as TanStackTable
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
+} from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -58,6 +65,28 @@ function columnWidthClass(columnId: string) {
   return "";
 }
 
+function buildPageItems(pageIndex: number, pageCount: number): Array<number | "ellipsis"> {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, index) => index);
+  }
+
+  const pages = new Set<number>([0, pageCount - 1, pageIndex - 1, pageIndex, pageIndex + 1]);
+  const ordered = Array.from(pages)
+    .filter((page) => page >= 0 && page < pageCount)
+    .sort((a, b) => a - b);
+
+  const items: Array<number | "ellipsis"> = [];
+  for (let index = 0; index < ordered.length; index += 1) {
+    const current = ordered[index];
+    const previous = index > 0 ? ordered[index - 1] : null;
+    if (previous !== null && current-previous > 1) {
+      items.push("ellipsis");
+    }
+    items.push(current);
+  }
+  return items;
+}
+
 const DeviceDataRow = memo(
   function DeviceDataRow({ row, rowHeight }: RowProps) {
     return (
@@ -88,6 +117,10 @@ export function DevicesTable({
   density
 }: Props) {
   const rows = table.getRowModel().rows;
+  const totalRows = table.getPrePaginationRowModel().rows.length;
+  const pageIndex = table.getState().pagination.pageIndex;
+  const pageCount = Math.max(table.getPageCount(), 1);
+  const pageItems = buildPageItems(pageIndex, pageCount);
   const rowHeight = density === "compact" ? "py-1" : "py-2";
   const columnsVersion = table
     .getVisibleLeafColumns()
@@ -154,28 +187,42 @@ export function DevicesTable({
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{rows.length} rows</p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            <ChevronLeft className="mr-1 h-4 w-4" /> Prev
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Showing {rows.length} of {totalRows} rows
+        </p>
+
+        <Pagination className="mx-0 w-auto justify-end">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              />
+            </PaginationItem>
+
+            {pageItems.map((item, index) => (
+              <PaginationItem key={`${item}-${index}`}>
+                {item === "ellipsis" ? (
+                  <PaginationEllipsis />
+                ) : (
+                  <PaginationLink
+                    isActive={item === pageIndex}
+                    onClick={() => table.setPageIndex(item)}
+                  >
+                    {item + 1}
+                  </PaginationLink>
+                )}
+              </PaginationItem>
+            ))}
+
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       </div>
     </div>
   );

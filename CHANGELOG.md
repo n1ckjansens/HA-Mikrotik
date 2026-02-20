@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.6] - 2026-02-20
+
+### Added
+- Added resilient clipboard helper with fallback copy strategy:
+  - `addon/frontend/src/lib/clipboard.ts`
+- Added shadcn pagination UI component:
+  - `addon/frontend/src/components/ui/pagination.tsx`
+
+### Changed
+- Updated devices table footer to use shadcn pagination controls with page links and ellipsis:
+  - `addon/frontend/src/components/devices/DevicesTable.tsx`
+- Updated copy actions in device table to use shared clipboard helper:
+  - `addon/frontend/src/components/devices/CopyValue.tsx`
+  - `addon/frontend/src/components/devices/device-table-columns.tsx`
+- Updated devices list query key shape to remove client-side pagination fields from query identity:
+  - `addon/frontend/src/hooks/useDevicesListQuery.ts`
+  - `addon/frontend/src/lib/query-keys.ts`
+- Bumped add-on version to `v0.0.6`:
+  - `addon/config.json`
+
+### Fixed
+- Fixed MAC copy action not triggering in table rows.
+- Fixed pagination behavior resetting to page 1 on polling/refetch.
+- Kept explicit page reset on filter/search changes while preventing reset on regular background refetch.
+- Added page index clamping when filtered result size shrinks:
+  - `addon/frontend/src/pages/DevicesPage.tsx`
+
 ## [0.0.5] - 2026-02-20
 
 ### Added

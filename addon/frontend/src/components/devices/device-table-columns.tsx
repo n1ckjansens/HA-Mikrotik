@@ -24,14 +24,15 @@ import {
   isNewDevice,
   isUnregisteredDevice
 } from "@/lib/device-semantics";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { formatExactTimestamp, formatLastSeenLabel } from "@/lib/time";
 import type { Device } from "@/types/device";
 
 async function copyToClipboard(value: string, label: string) {
-  try {
-    await navigator.clipboard.writeText(value);
+  const copied = await copyTextToClipboard(value);
+  if (copied) {
     toast.success(`${label} copied`);
-  } catch {
+  } else {
     toast.error(`Unable to copy ${label.toLowerCase()}`);
   }
 }
@@ -89,7 +90,6 @@ export function buildDeviceColumns({
                 mono
                 className="h-6 w-fit max-w-full px-1 text-xs text-muted-foreground"
                 onClick={(event) => {
-                  event.preventDefault();
                   event.stopPropagation();
                 }}
               />
