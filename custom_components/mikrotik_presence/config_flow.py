@@ -11,11 +11,9 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.components.hassio import AddonError, is_hassio
-from homeassistant.components.hassio.addon_manager import AddonState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from .addon import get_addon_manager
 from .const import ADDON_NAME, ADDON_SLUG, CONF_API_KEY, CONF_BASE_URL, DOMAIN
@@ -31,17 +29,19 @@ class MikrotikPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> FlowResult:
+    async def async_step_hassio(self, discovery_info: Any) -> FlowResult:
         """Handle Supervisor discovery."""
         if self._async_current_entries():
             return self.async_abort(reason="already_configured")
 
-        if discovery_info.slug != ADDON_SLUG:
+        discovery_slug = getattr(discovery_info, "slug", None)
+        if discovery_slug != ADDON_SLUG:
             return self.async_abort(reason="not_our_addon")
 
+        discovery_config = getattr(discovery_info, "config", None)
         base_url = _build_base_url(
-            discovery_info.config.get("host") if discovery_info.config else None,
-            discovery_info.config.get("port") if discovery_info.config else None,
+            discovery_config.get("host") if isinstance(discovery_config, dict) else None,
+            discovery_config.get("port") if isinstance(discovery_config, dict) else None,
         )
         if base_url is None:
             return self.async_abort(reason="invalid_discovery")
@@ -67,9 +67,8 @@ class MikrotikPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_manual()
 
         addon_manager = get_addon_manager(self.hass)
-        addon_info = await self._async_get_addon_info(addon_manager)
-
-        if addon_info is not None and addon_info.state == AddonState.RUNNING:
+        is_installed = await self._async_is_addon_installed(addon_manager)
+        if is_installed:
             base_url = await self._async_get_addon_base_url(addon_manager)
             if base_url is not None and await self._async_can_connect(base_url=base_url, api_key=None):
                 return await self._async_create_config_entry(
@@ -78,7 +77,7 @@ class MikrotikPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     api_key=None,
                 )
 
-        if addon_info is None or addon_info.state == AddonState.NOT_INSTALLED:
+        if not is_installed:
             return self.async_show_menu(step_id="user", menu_options=["addon_install", "manual"])
 
         return self.async_show_menu(step_id="user", menu_options=["addon", "manual"])
@@ -94,16 +93,14 @@ class MikrotikPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="no_supervisor")
 
         addon_manager = get_addon_manager(self.hass)
-        addon_info = await self._async_get_addon_info(addon_manager)
-        if addon_info is None or addon_info.state == AddonState.NOT_INSTALLED:
+        if not await self._async_is_addon_installed(addon_manager):
             return self.async_abort(reason="addon_not_installed")
 
-        if addon_info.state != AddonState.RUNNING:
-            try:
-                await addon_manager.async_schedule_start_addon()
-            except AddonError as err:
-                _LOGGER.warning("Failed to start addon %s: %s", ADDON_SLUG, err)
-                return self.async_abort(reason="addon_operation_failed")
+        try:
+            await addon_manager.async_schedule_start_addon()
+        except AddonError as err:
+            _LOGGER.warning("Failed to start addon %s: %s", ADDON_SLUG, err)
+            return self.async_abort(reason="addon_operation_failed")
 
         base_url = await self._async_wait_for_addon_base_url(addon_manager)
         if base_url is None:
@@ -129,10 +126,8 @@ class MikrotikPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="no_supervisor")
 
         addon_manager = get_addon_manager(self.hass)
-        addon_info = await self._async_get_addon_info(addon_manager)
-
         try:
-            if addon_info is None or addon_info.state == AddonState.NOT_INSTALLED:
+            if not await self._async_is_addon_installed(addon_manager):
                 await addon_manager.async_schedule_install_addon()
             await addon_manager.async_schedule_start_addon()
         except AddonError as err:
@@ -206,16 +201,31 @@ class MikrotikPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
-    async def _async_get_addon_info(self, addon_manager: Any) -> Any | None:
-        """Return add-on info or None when unavailable."""
+    async def _async_is_addon_installed(self, addon_manager: Any) -> bool:
+        """Return whether addon is installed."""
         try:
-            return await addon_manager.async_get_addon_info()
+            return bool(await addon_manager.async_is_installed())
+        except AddonError as err:
+            _LOGGER.debug("Cannot determine add-on installation state for %s: %s", ADDON_SLUG, err)
+            return False
+
+    async def _async_get_addon_info(self, addon_manager: Any) -> dict[str, Any] | None:
+        """Return add-on info dict or None when unavailable."""
+        try:
+            info = await addon_manager.async_get_addon_info()
         except AddonError as err:
             _LOGGER.debug("Cannot load addon info for %s: %s", ADDON_SLUG, err)
             return None
+        if isinstance(info, dict):
+            return info
+        return None
 
     async def _async_get_addon_base_url(self, addon_manager: Any) -> str | None:
         """Return backend base URL from add-on discovery info."""
+        addon_info = await self._async_get_addon_info(addon_manager)
+        if addon_info is not None and not addon_info.get("started", True):
+            return None
+
         try:
             discovery = await addon_manager.async_get_addon_discovery_info()
         except AddonError as err:

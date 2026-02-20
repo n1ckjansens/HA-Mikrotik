@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `addon/config.yaml`
   - `addon/Dockerfile`
   - `addon/internal/config/config.go`
-- Bumped custom integration version to `v0.0.8`:
+- Bumped custom integration version to `v0.0.8` (HA manifest format):
   - `custom_components/mikrotik_presence/manifest.json`
 - Bumped frontend package version to `v0.0.8`:
   - `addon/frontend/package.json`
