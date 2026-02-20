@@ -1,7 +1,7 @@
 {
   "name": "mikrotik-presence-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "v0.0.7",
   "type": "module",
   "scripts": {
     "dev": "vite",

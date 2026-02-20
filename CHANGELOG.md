@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v0.0.7] - 2026-02-20
+
+### Added
+- Added Home Assistant custom integration `mikrotik_presence` with:
+  - config flow and options flow
+  - async backend API client
+  - coordinators for device/global capabilities
+  - `switch` and `select` platforms with stable `unique_id` and device registry mapping
+  - translations (`en`/`ru`) and HACS metadata (`hacs.json`)
+- Added backend URL auto-discovery in integration config flow:
+  - Supervisor-aware discovery attempt for add-on installations
+  - fallback candidate probing (`homeassistant`, `127.0.0.1`, `host.docker.internal`)
+  - suggested URL prefill in setup form
+
+### Changed
+- Bumped add-on version to `v0.0.7`:
+  - `addon/config.json`
+- Bumped custom integration version to `v0.0.7`:
+  - `custom_components/mikrotik_presence/manifest.json`
+- Bumped frontend package version to `v0.0.7`:
+  - `addon/frontend/package.json`
+  - `addon/frontend/package-lock.json`
+
 ## [0.0.6] - 2026-02-20
 
 ### Added
