@@ -1,0 +1,39 @@
+{
+  "title": "MikroTik Presence",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to MikroTik Presence backend",
+        "description": "Enter URL of MikroTik Presence backend (add-on) and optional API key. URL can be auto-detected when add-on is installed in Home Assistant.",
+        "data": {
+          "base_url": "Backend URL",
+          "api_key": "API key (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to backend",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This backend is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Update MikroTik Presence connection",
+        "data": {
+          "base_url": "Backend URL",
+          "api_key": "API key (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to backend",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    }
+  }
+}

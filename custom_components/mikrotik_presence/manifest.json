@@ -1,0 +1,15 @@
+{
+  "domain": "mikrotik_presence",
+  "name": "MikroTik Presence",
+  "version": "0.1.0",
+  "documentation": "https://github.com/n1ckjansens/HA-Mikrotik",
+  "issue_tracker": "https://github.com/n1ckjansens/HA-Mikrotik/issues",
+  "requirements": [
+    "aiohttp>=3.9.0"
+  ],
+  "dependencies": [],
+  "codeowners": ["@n1ckjansens"],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "integration_type": "hub"
+}
