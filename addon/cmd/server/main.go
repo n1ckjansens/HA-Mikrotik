@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	mikrotikadapter "github.com/micro-ha/mikrotik-presence/addon/internal/adapters/mikrotik"
 	mikrotikactions "github.com/micro-ha/mikrotik-presence/addon/internal/adapters/mikrotik/actions"
 	mikrotikstatesources "github.com/micro-ha/mikrotik-presence/addon/internal/adapters/mikrotik/statesources"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/aggregator"
@@ -22,6 +21,7 @@ import (
 	"github.com/micro-ha/mikrotik-presence/addon/internal/oui"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/poller"
 	"github.com/micro-ha/mikrotik-presence/addon/internal/repository/sqlite"
+	"github.com/micro-ha/mikrotik-presence/addon/internal/routeros"
 	automationservice "github.com/micro-ha/mikrotik-presence/addon/internal/services/automation"
 	automationengine "github.com/micro-ha/mikrotik-presence/addon/internal/services/automation/engine"
 	automationregistry "github.com/micro-ha/mikrotik-presence/addon/internal/services/automation/registry"
@@ -54,7 +54,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	routerClient := mikrotikadapter.NewRestClient(logger.With("component", "routeros"))
+	routerClient := routeros.NewManager(logger.With("component", "routeros"))
+	defer routerClient.Close()
 	agg := aggregator.NewWithThresholds(subnet.New(), ouiDB, cfg.PresenceThresholds)
 
 	cfgClient := configsync.NewClient(cfg.AddonOptionsPath)

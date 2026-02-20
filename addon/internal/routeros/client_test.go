@@ -1,108 +1,118 @@
 package routeros
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
 	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
+	"log/slog"
+	"sync"
 	"testing"
+	"time"
 
-	"github.com/micro-ha/mikrotik-presence/addon/internal/model"
+	goros "github.com/go-routeros/routeros/v3"
+	"github.com/go-routeros/routeros/v3/proto"
 )
 
-type mockRoundTripper struct {
-	payload map[string]any
-}
+func TestRunReconnectsOnNetworkFailure(t *testing.T) {
+	t.Helper()
 
-func (m mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	payload, ok := m.payload[req.URL.Path]
-	if !ok {
-		return &http.Response{
-			StatusCode: http.StatusNotFound,
-			Header:     make(http.Header),
-			Body:       io.NopCloser(bytes.NewReader([]byte(`{"error":"not found"}`))),
-			Request:    req,
-		}, nil
+	var (
+		mu        sync.Mutex
+		dialCalls int
+		runCalls  int
+	)
+
+	client := &Client{
+		config: Config{Address: "127.0.0.1:8728", Username: "u", Password: "p", Timeout: time.Second},
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		closed: make(chan struct{}),
+		dialFn: func(ctx context.Context, cfg Config) (*goros.Client, error) {
+			_ = ctx
+			_ = cfg
+			mu.Lock()
+			dialCalls++
+			mu.Unlock()
+			return &goros.Client{}, nil
+		},
+		runFn: func(ctx context.Context, conn *goros.Client, cmd string, args ...string) (*goros.Reply, error) {
+			_ = ctx
+			_ = conn
+			_ = cmd
+			_ = args
+			mu.Lock()
+			runCalls++
+			current := runCalls
+			mu.Unlock()
+			if current == 1 {
+				return nil, io.EOF
+			}
+			return &goros.Reply{Done: &proto.Sentence{Word: "!done", Map: map[string]string{}}}, nil
+		},
+		closeFn: func(conn *goros.Client) error {
+			_ = conn
+			return nil
+		},
+		sleepFn: func(ctx context.Context, wait time.Duration) error {
+			_ = ctx
+			_ = wait
+			return nil
+		},
 	}
-	body, _ := json.Marshal(payload)
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Header:     make(http.Header),
-		Body:       io.NopCloser(bytes.NewReader(body)),
-		Request:    req,
-	}, nil
-}
 
-func TestFetchSnapshotWithMockRouterOS(t *testing.T) {
-	transport := mockRoundTripper{payload: map[string]any{
-		"/rest/ip/dhcp-server/lease":              []map[string]any{{"mac-address": "AA:BB:CC:DD:EE:FF", "address": "192.168.88.10", "status": "bound"}},
-		"/rest/interface/wifi/registration-table": []map[string]any{{"mac-address": "AA:BB:CC:DD:EE:FF", "interface": "wifi1"}},
-		"/rest/interface/bridge/host":             []map[string]any{{"mac-address": "11:22:33:44:55:66", "on-interface": "bridge"}},
-		"/rest/ip/arp":                            []map[string]any{{"mac-address": "11:22:33:44:55:66", "address": "192.168.88.20"}},
-		"/rest/ip/address":                        []map[string]any{{"address": "192.168.88.1/24"}},
-	}}
-
-	httpClient := &http.Client{Transport: transport}
-	client := NewClientWithHTTPClient(httpClient)
-	cfg := model.RouterConfig{Host: "router.local", Username: "u", Password: "p", SSL: false, VerifyTLS: true, PollIntervalSec: 5}
-
-	snapshot, err := client.FetchSnapshot(context.Background(), cfg)
+	reply, err := client.Run(context.Background(), "/system/identity/print")
 	if err != nil {
-		t.Fatalf("fetch failed: %v", err)
+		t.Fatalf("Run returned error: %v", err)
 	}
-	if len(snapshot.DHCP) != 1 || len(snapshot.WiFi) != 1 || len(snapshot.Bridge) != 1 || len(snapshot.ARP) != 1 {
-		t.Fatalf("unexpected snapshot lengths: %+v", snapshot)
+	if reply == nil || reply.Done == nil {
+		t.Fatalf("expected non-nil done sentence")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if dialCalls != 2 {
+		t.Fatalf("expected 2 dial attempts, got %d", dialCalls)
+	}
+	if runCalls != 2 {
+		t.Fatalf("expected 2 run attempts, got %d", runCalls)
 	}
 }
 
-func TestFetchSnapshotFallsBackToHTTPOnHTTPSMismatch(t *testing.T) {
-	payload := map[string]any{
-		"/rest/ip/dhcp-server/lease":              []map[string]any{{"mac-address": "AA:BB:CC:DD:EE:FF", "address": "192.168.88.10", "status": "bound"}},
-		"/rest/interface/wifi/registration-table": []map[string]any{{"mac-address": "AA:BB:CC:DD:EE:FF", "interface": "wifi1"}},
-		"/rest/interface/bridge/host":             []map[string]any{{"mac-address": "11:22:33:44:55:66", "on-interface": "bridge"}},
-		"/rest/ip/arp":                            []map[string]any{{"mac-address": "11:22:33:44:55:66", "address": "192.168.88.20"}},
-		"/rest/ip/address":                        []map[string]any{{"address": "192.168.88.1/24"}},
+func TestRunPropagatesNonRetryableError(t *testing.T) {
+	t.Helper()
+
+	expected := errors.New("permission denied")
+	client := &Client{
+		config: Config{Address: "127.0.0.1:8728", Username: "u", Password: "p", Timeout: time.Second},
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		closed: make(chan struct{}),
+		dialFn: func(ctx context.Context, cfg Config) (*goros.Client, error) {
+			_ = ctx
+			_ = cfg
+			return &goros.Client{}, nil
+		},
+		runFn: func(ctx context.Context, conn *goros.Client, cmd string, args ...string) (*goros.Reply, error) {
+			_ = ctx
+			_ = conn
+			_ = cmd
+			_ = args
+			return nil, expected
+		},
+		closeFn: func(conn *goros.Client) error {
+			_ = conn
+			return nil
+		},
+		sleepFn: func(ctx context.Context, wait time.Duration) error {
+			_ = ctx
+			_ = wait
+			return nil
+		},
 	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		row, ok := payload[req.URL.Path]
-		if !ok {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(row); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}))
-	defer server.Close()
-
-	host := strings.TrimPrefix(server.URL, "http://")
-	client := NewClient()
-	cfg := model.RouterConfig{
-		Host:            host,
-		Username:        "u",
-		Password:        "p",
-		SSL:             true,
-		VerifyTLS:       false,
-		PollIntervalSec: 5,
+	_, err := client.Run(context.Background(), "/x")
+	if err == nil {
+		t.Fatalf("expected error")
 	}
-
-	snapshot, err := client.FetchSnapshot(context.Background(), cfg)
-	if err != nil {
-		t.Fatalf("fetch failed: %v", err)
-	}
-	if len(snapshot.DHCP) != 1 || len(snapshot.WiFi) != 1 || len(snapshot.Bridge) != 1 || len(snapshot.ARP) != 1 {
-		t.Fatalf("unexpected snapshot lengths: %+v", snapshot)
-	}
-}
-
-func TestShouldFallbackToHTTPOnDeadlineExceeded(t *testing.T) {
-	cfg := model.RouterConfig{SSL: true}
-	if !shouldFallbackToHTTP(cfg, "https://router.local/rest/ip/address", context.DeadlineExceeded) {
-		t.Fatalf("expected fallback to HTTP for deadline exceeded")
+	if !errors.Is(err, expected) {
+		t.Fatalf("expected wrapped original error, got %v", err)
 	}
 }
