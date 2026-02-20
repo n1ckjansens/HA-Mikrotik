@@ -22,14 +22,14 @@ services:
     env_file:
       - .env.dev
     environment:
-      HTTP_ADDR: :8099
+      HTTP_ADDR: :8080
       DB_PATH: /data/mikrotik_presence.db
       ADDON_OPTIONS_PATH: /data/options.json
       FRONTEND_DIST: /workspace/addon/web
     depends_on:
       - mock-routeros
     ports:
-      - "8099:8099"
+      - "8080:8080"
 
   frontend:
     image: node:20-alpine
@@ -40,7 +40,7 @@ services:
       - addon_frontend_node_modules:/workspace/addon/frontend/node_modules
     environment:
       CHOKIDAR_USEPOLLING: "true"
-      VITE_API_PROXY_TARGET: http://backend:8099
+      VITE_API_PROXY_TARGET: http://backend:8080
     command: ["sh", "-lc", "npm install && npm run dev -- --host 0.0.0.0 --port 5173"]
     depends_on:
       - backend

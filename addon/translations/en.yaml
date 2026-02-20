@@ -19,4 +19,4 @@ configuration:
     description: Device poll interval. Minimum is 5 seconds.
 
 network:
-  8099/tcp: HTTP API / Ingress web UI
+  8080/tcp: HTTP API / Ingress web UI

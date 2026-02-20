@@ -20,7 +20,7 @@ RUN apk add --no-cache ca-certificates
 COPY --from=builder /out/mikrotik-presence /usr/local/bin/mikrotik-presence
 COPY --from=frontend-builder /frontend/dist /app/frontend/dist
 
-ENV HTTP_ADDR=:8099
+ENV HTTP_ADDR=:8080
 ENV DB_PATH=/data/mikrotik_presence.db
 ENV ADDON_OPTIONS_PATH=/data/options.json
 ENV FRONTEND_DIST=/app/frontend/dist

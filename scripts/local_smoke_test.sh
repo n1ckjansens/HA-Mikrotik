@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-backend_url="${BACKEND_URL:-http://127.0.0.1:8099}"
+backend_url="${BACKEND_URL:-http://127.0.0.1:8080}"
 mock_router_url="${MOCK_ROUTER_URL:-http://127.0.0.1:18080}"
 
 echo "[smoke] Health check"

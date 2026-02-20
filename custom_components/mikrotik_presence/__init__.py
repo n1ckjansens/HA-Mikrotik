@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -20,21 +18,22 @@ from .const import (
 )
 from .coordinator import DevicesCoordinator, GlobalCoordinator
 
-_LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up MikroTik Presence from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    base_url = str(entry.options.get(CONF_BASE_URL) or entry.data.get(CONF_BASE_URL) or "").strip()
-    api_key = str(entry.options.get(CONF_API_KEY) or entry.data.get(CONF_API_KEY) or "").strip()
+    base_url = str(entry.data[CONF_BASE_URL]).strip()
+    raw_api_key = entry.data.get(CONF_API_KEY)
+    api_key = str(raw_api_key).strip() if isinstance(raw_api_key, str) else None
+    if not api_key:
+        api_key = None
 
     session = async_get_clientsession(hass)
-    client = MikrotikPresenceClient(session, base_url, api_key or None)
+    client = MikrotikPresenceClient(session, base_url, api_key)
 
-    devices_coordinator = DevicesCoordinator(hass, client, _LOGGER)
-    global_coordinator = GlobalCoordinator(hass, client, _LOGGER)
+    devices_coordinator = DevicesCoordinator(hass, client)
+    global_coordinator = GlobalCoordinator(hass, client)
 
     await devices_coordinator.async_config_entry_first_refresh()
     await global_coordinator.async_config_entry_first_refresh()

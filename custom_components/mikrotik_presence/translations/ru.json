@@ -3,8 +3,17 @@
   "config": {
     "step": {
       "user": {
+        "title": "Выберите способ настройки",
+        "description": "Используйте обнаружение add-on в Home Assistant или настройте URL backend вручную.",
+        "menu_options": {
+          "addon": "Использовать установленный add-on",
+          "addon_install": "Установить и запустить add-on",
+          "manual": "Настроить вручную"
+        }
+      },
+      "manual": {
         "title": "Подключение к backend MikroTik Presence",
-        "description": "Укажите URL backend MikroTik Presence (add-on) и опциональный API ключ. Если add-on установлен в Home Assistant, URL может определяться автоматически.",
+        "description": "Укажите URL backend MikroTik Presence и опциональный API ключ.",
         "data": {
           "base_url": "URL backend",
           "api_key": "API ключ (опционально)"
@@ -17,7 +26,13 @@
       "unknown": "Неожиданная ошибка"
     },
     "abort": {
-      "already_configured": "Этот backend уже настроен"
+      "already_configured": "Этот backend уже настроен",
+      "not_our_addon": "Событие обнаружения относится к другому add-on",
+      "invalid_discovery": "Данные обнаружения некорректны",
+      "no_supervisor": "Для действий с add-on требуется Home Assistant Supervisor",
+      "addon_not_installed": "Add-on MikroTik Presence не установлен",
+      "addon_operation_failed": "Не удалось установить или запустить add-on",
+      "cannot_connect": "Не удалось подключиться к backend"
     }
   },
   "options": {

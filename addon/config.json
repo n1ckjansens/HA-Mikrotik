@@ -9,7 +9,17 @@
   "startup": "application",
   "boot": "auto",
   "ingress": true,
-  "ingress_port": 8099,
+  "ingress_port": 8080,
+  "webui": "http://[HOST]:[PORT:8080]/",
+  "discovery": [
+    {
+      "service": "mikrotik_presence",
+      "config": {
+        "host": "[HOST]",
+        "port": 8080
+      }
+    }
+  ],
   "panel_icon": "mdi:router-wireless",
   "panel_title": "MikroTik Presence",
   "options": {
@@ -29,9 +39,9 @@
     "poll_interval_sec": "int(5,300)"
   },
   "ports": {
-    "8099/tcp": null
+    "8080/tcp": 8080
   },
   "ports_description": {
-    "8099/tcp": "HTTP API / Ingress web UI"
+    "8080/tcp": "HTTP API / Ingress web UI"
   }
 }

@@ -3,8 +3,17 @@
   "config": {
     "step": {
       "user": {
+        "title": "Choose setup method",
+        "description": "Use Home Assistant add-on discovery or configure backend URL manually.",
+        "menu_options": {
+          "addon": "Use installed add-on",
+          "addon_install": "Install and start add-on",
+          "manual": "Configure manually"
+        }
+      },
+      "manual": {
         "title": "Connect to MikroTik Presence backend",
-        "description": "Enter URL of MikroTik Presence backend (add-on) and optional API key. URL can be auto-detected when add-on is installed in Home Assistant.",
+        "description": "Enter URL of MikroTik Presence backend and optional API key.",
         "data": {
           "base_url": "Backend URL",
           "api_key": "API key (optional)"
@@ -17,7 +26,13 @@
       "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "This backend is already configured"
+      "already_configured": "This backend is already configured",
+      "not_our_addon": "Discovery event is for another add-on",
+      "invalid_discovery": "Discovery data is invalid",
+      "no_supervisor": "Home Assistant Supervisor is required for add-on actions",
+      "addon_not_installed": "MikroTik Presence add-on is not installed",
+      "addon_operation_failed": "Failed to install or start add-on",
+      "cannot_connect": "Cannot connect to backend"
     }
   },
   "options": {

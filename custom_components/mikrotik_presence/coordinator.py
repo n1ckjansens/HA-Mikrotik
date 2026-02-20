@@ -12,6 +12,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .client import CapabilityDTO, DeviceDTO, MikrotikApiError, MikrotikPresenceClient
 from .const import DOMAIN, UPDATE_INTERVAL_SECONDS
 
+_LOGGER = logging.getLogger(__name__)
+
 
 class DevicesCoordinator(DataUpdateCoordinator[dict[str, DeviceDTO]]):
     """Coordinator for registered devices and their capabilities."""
@@ -20,11 +22,10 @@ class DevicesCoordinator(DataUpdateCoordinator[dict[str, DeviceDTO]]):
         self,
         hass: HomeAssistant,
         client: MikrotikPresenceClient,
-        logger: logging.Logger,
     ) -> None:
         super().__init__(
             hass,
-            logger,
+            _LOGGER,
             name=f"{DOMAIN}_devices",
             update_interval=timedelta(seconds=UPDATE_INTERVAL_SECONDS),
         )
@@ -60,11 +61,10 @@ class GlobalCoordinator(DataUpdateCoordinator[list[CapabilityDTO]]):
         self,
         hass: HomeAssistant,
         client: MikrotikPresenceClient,
-        logger: logging.Logger,
     ) -> None:
         super().__init__(
             hass,
-            logger,
+            _LOGGER,
             name=f"{DOMAIN}_global",
             update_interval=timedelta(seconds=UPDATE_INTERVAL_SECONDS),
         )

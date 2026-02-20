@@ -27,7 +27,7 @@ make dev-up-d
 3. Open UI:
 
 - Frontend dev server: `http://localhost:5173`
-- Backend API: `http://localhost:8099`
+- Backend API: `http://localhost:8080`
 
 4. Run smoke test:
 
@@ -69,8 +69,8 @@ docker compose -f docker-compose.dev.yml up -d --force-recreate backend
 3. Trigger immediate refresh and inspect devices:
 
 ```bash
-curl -fsS -X POST http://localhost:8099/api/refresh -H 'Content-Type: application/json' -d '{}'
-curl -fsS http://localhost:8099/api/devices
+curl -fsS -X POST http://localhost:8080/api/refresh -H 'Content-Type: application/json' -d '{}'
+curl -fsS http://localhost:8080/api/devices
 ```
 
 ## Hot Reload
@@ -121,7 +121,7 @@ Backend:
 cd addon
 go mod tidy
 go test ./... -race
-HTTP_ADDR=:8099 DB_PATH=/tmp/mikrotik_presence.db ROUTER_HOST=127.0.0.1:18080 ROUTER_USERNAME=admin ROUTER_PASSWORD=admin ROUTER_SSL=false ROUTER_VERIFY_TLS=false ROUTER_POLL_INTERVAL_SEC=5 go run ./cmd/server
+HTTP_ADDR=:8080 DB_PATH=/tmp/mikrotik_presence.db ROUTER_HOST=127.0.0.1:18080 ROUTER_USERNAME=admin ROUTER_PASSWORD=admin ROUTER_SSL=false ROUTER_VERIFY_TLS=false ROUTER_POLL_INTERVAL_SEC=5 go run ./cmd/server
 ```
 
 Frontend:
@@ -129,5 +129,5 @@ Frontend:
 ```bash
 cd addon/frontend
 npm install
-VITE_API_PROXY_TARGET=http://127.0.0.1:8099 npm run dev
+VITE_API_PROXY_TARGET=http://127.0.0.1:8080 npm run dev
 ```

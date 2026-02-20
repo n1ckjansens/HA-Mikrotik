@@ -2,338 +2,294 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Any
+import asyncio
 import logging
-import os
+from typing import Any
 
 import aiohttp
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import AbortFlow, FlowResult
+from homeassistant.components.hassio import AddonError, is_hassio
+from homeassistant.components.hassio.addon_manager import AddonState
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
-from .client import MikrotikApiError, MikrotikAuthError, MikrotikPresenceClient
-from .const import (
-    AUTO_DISCOVERY_CANDIDATES,
-    CONF_API_KEY,
-    CONF_BASE_URL,
-    DEFAULT_BACKEND_PORT,
-    DOMAIN,
-    SUPERVISOR_ADDON_SLUG,
-)
+from .addon import get_addon_manager
+from .const import ADDON_NAME, ADDON_SLUG, CONF_API_KEY, CONF_BASE_URL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+DEFAULT_BASE_URL = "http://homeassistant:8080"
+ADDON_ENTRY_TITLE = f"{ADDON_NAME} (addon)"
+
 
 class MikrotikPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for MikroTik Presence."""
+    """Handle config flow for MikroTik Presence."""
 
     VERSION = 1
 
-    def __init__(self) -> None:
-        """Initialize config flow state."""
-        self._autodiscovered_url: str | None = None
+    async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> FlowResult:
+        """Handle Supervisor discovery."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+
+        if discovery_info.slug != ADDON_SLUG:
+            return self.async_abort(reason="not_our_addon")
+
+        base_url = _build_base_url(
+            discovery_info.config.get("host") if discovery_info.config else None,
+            discovery_info.config.get("port") if discovery_info.config else None,
+        )
+        if base_url is None:
+            return self.async_abort(reason="invalid_discovery")
+
+        if not await self._async_can_connect(base_url=base_url, api_key=None):
+            return self.async_abort(reason="cannot_connect")
+
+        return await self._async_create_config_entry(
+            title=ADDON_ENTRY_TITLE,
+            base_url=base_url,
+            api_key=None,
+        )
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Handle the initial step."""
+        """Handle user initiated flow."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+
+        if user_input is not None:
+            return await self.async_step_manual(user_input)
+
+        if not is_hassio(self.hass):
+            return await self.async_step_manual()
+
+        addon_manager = get_addon_manager(self.hass)
+        addon_info = await self._async_get_addon_info(addon_manager)
+
+        if addon_info is not None and addon_info.state == AddonState.RUNNING:
+            base_url = await self._async_get_addon_base_url(addon_manager)
+            if base_url is not None and await self._async_can_connect(base_url=base_url, api_key=None):
+                return await self._async_create_config_entry(
+                    title=ADDON_ENTRY_TITLE,
+                    base_url=base_url,
+                    api_key=None,
+                )
+
+        if addon_info is None or addon_info.state == AddonState.NOT_INSTALLED:
+            return self.async_show_menu(step_id="user", menu_options=["addon_install", "manual"])
+
+        return self.async_show_menu(step_id="user", menu_options=["addon", "manual"])
+
+    async def async_step_addon(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Start installed add-on and connect automatically."""
+        del user_input
+
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+
+        if not is_hassio(self.hass):
+            return self.async_abort(reason="no_supervisor")
+
+        addon_manager = get_addon_manager(self.hass)
+        addon_info = await self._async_get_addon_info(addon_manager)
+        if addon_info is None or addon_info.state == AddonState.NOT_INSTALLED:
+            return self.async_abort(reason="addon_not_installed")
+
+        if addon_info.state != AddonState.RUNNING:
+            try:
+                await addon_manager.async_schedule_start_addon()
+            except AddonError as err:
+                _LOGGER.warning("Failed to start addon %s: %s", ADDON_SLUG, err)
+                return self.async_abort(reason="addon_operation_failed")
+
+        base_url = await self._async_wait_for_addon_base_url(addon_manager)
+        if base_url is None:
+            return self.async_abort(reason="cannot_connect")
+
+        if not await self._async_can_connect(base_url=base_url, api_key=None):
+            return self.async_abort(reason="cannot_connect")
+
+        return await self._async_create_config_entry(
+            title=ADDON_ENTRY_TITLE,
+            base_url=base_url,
+            api_key=None,
+        )
+
+    async def async_step_addon_install(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Install and start add-on, then connect automatically."""
+        del user_input
+
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+
+        if not is_hassio(self.hass):
+            return self.async_abort(reason="no_supervisor")
+
+        addon_manager = get_addon_manager(self.hass)
+        addon_info = await self._async_get_addon_info(addon_manager)
+
+        try:
+            if addon_info is None or addon_info.state == AddonState.NOT_INSTALLED:
+                await addon_manager.async_schedule_install_addon()
+            await addon_manager.async_schedule_start_addon()
+        except AddonError as err:
+            _LOGGER.warning("Failed to install/start addon %s: %s", ADDON_SLUG, err)
+            return self.async_abort(reason="addon_operation_failed")
+
+        base_url = await self._async_wait_for_addon_base_url(addon_manager)
+        if base_url is None:
+            return self.async_abort(reason="cannot_connect")
+
+        if not await self._async_can_connect(base_url=base_url, api_key=None):
+            return self.async_abort(reason="cannot_connect")
+
+        return await self._async_create_config_entry(
+            title=ADDON_ENTRY_TITLE,
+            base_url=base_url,
+            api_key=None,
+        )
+
+    async def async_step_manual(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Manual backend configuration."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
+
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            raw_base_url = user_input.get(CONF_BASE_URL, "")
-            api_key = _normalize_optional_string(user_input.get(CONF_API_KEY))
             try:
-                if str(raw_base_url).strip():
-                    base_url = _normalize_base_url(raw_base_url)
-                else:
-                    discovered_url = await _async_discover_backend_url(self.hass, api_key)
-                    if discovered_url is None:
-                        raise CannotConnect("Cannot auto-discover backend URL")
-                    base_url = discovered_url
-
-                await self.async_set_unique_id(base_url.lower())
-                self._abort_if_unique_id_configured()
-
-                await _async_validate_connection(self.hass, base_url, api_key)
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except CannotConnect:
+                base_url = _normalize_base_url(user_input.get(CONF_BASE_URL, ""))
+                api_key = _normalize_optional_string(user_input.get(CONF_API_KEY))
+            except ValueError:
                 errors["base"] = "cannot_connect"
-            except AbortFlow:
-                raise
-            except Exception:
-                _LOGGER.exception("Unexpected error while validating MikroTik Presence connection")
-                errors["base"] = "unknown"
             else:
-                return self.async_create_entry(
-                    title="MikroTik Presence",
-                    data={
-                        CONF_BASE_URL: base_url,
-                        CONF_API_KEY: api_key or "",
-                    },
-                )
-
-        if self._autodiscovered_url is None:
-            self._autodiscovered_url = await _async_discover_backend_url(self.hass)
-
-        data_schema = vol.Schema(
-            {
-                vol.Required(CONF_BASE_URL): str,
-                vol.Optional(CONF_API_KEY, default=""): str,
-            }
-        )
-        if self._autodiscovered_url:
-            data_schema = self.add_suggested_values_to_schema(
-                data_schema,
-                {CONF_BASE_URL: self._autodiscovered_url},
-            )
+                if await self._async_can_connect(base_url=base_url, api_key=api_key):
+                    return await self._async_create_config_entry(
+                        title=ADDON_NAME,
+                        base_url=base_url,
+                        api_key=api_key,
+                    )
+                errors["base"] = "cannot_connect"
 
         return self.async_show_form(
-            step_id="user",
-            data_schema=data_schema,
-            errors=errors,
-        )
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
-        """Create options flow handler."""
-        return MikrotikPresenceOptionsFlow(config_entry)
-
-
-class MikrotikPresenceOptionsFlow(config_entries.OptionsFlow):
-    """Handle options flow for MikroTik Presence."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self._config_entry = config_entry
-
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Manage integration options."""
-        errors: dict[str, str] = {}
-
-        current_base_url = str(
-            self._config_entry.options.get(CONF_BASE_URL)
-            or self._config_entry.data.get(CONF_BASE_URL)
-            or ""
-        )
-        current_api_key = str(
-            self._config_entry.options.get(CONF_API_KEY)
-            or self._config_entry.data.get(CONF_API_KEY)
-            or ""
-        )
-
-        if user_input is not None:
-            raw_base_url = user_input.get(CONF_BASE_URL, "")
-            raw_api_key = user_input.get(CONF_API_KEY)
-            api_key = _normalize_optional_string(raw_api_key)
-            try:
-                if str(raw_base_url).strip():
-                    base_url = _normalize_base_url(raw_base_url)
-                else:
-                    discovered_url = await _async_discover_backend_url(self.hass, api_key)
-                    if discovered_url is None:
-                        raise CannotConnect("Cannot auto-discover backend URL")
-                    base_url = discovered_url
-                await _async_validate_connection(self.hass, base_url, api_key)
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                _LOGGER.exception("Unexpected error while validating MikroTik Presence options")
-                errors["base"] = "unknown"
-            else:
-                return self.async_create_entry(
-                    title="",
-                    data={
-                        CONF_BASE_URL: base_url,
-                        CONF_API_KEY: api_key or "",
-                    },
-                )
-
-            current_base_url = str(raw_base_url).strip() or current_base_url
-            current_api_key = str(raw_api_key or "").strip()
-
-        return self.async_show_form(
-            step_id="init",
+            step_id="manual",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_BASE_URL, default=current_base_url): str,
-                    vol.Optional(CONF_API_KEY, default=current_api_key): str,
+                    vol.Required(CONF_BASE_URL, default=DEFAULT_BASE_URL): str,
+                    vol.Optional(CONF_API_KEY, default=""): str,
                 }
             ),
             errors=errors,
         )
 
+    async def _async_create_config_entry(
+        self,
+        title: str,
+        base_url: str,
+        api_key: str | None,
+    ) -> FlowResult:
+        """Create config entry with uniqueness checks."""
+        if self._async_current_entries():
+            return self.async_abort(reason="already_configured")
 
-class CannotConnect(Exception):
-    """Error to indicate we cannot connect."""
+        await self.async_set_unique_id(DOMAIN)
+        self._abort_if_unique_id_configured()
 
-
-class InvalidAuth(Exception):
-    """Error to indicate there is invalid auth."""
-
-
-async def _async_validate_connection(
-    hass: HomeAssistant,
-    base_url: str,
-    api_key: str | None,
-) -> None:
-    """Validate backend connection by calling devices endpoint."""
-    session = async_get_clientsession(hass)
-    client = MikrotikPresenceClient(session, base_url, api_key)
-
-    try:
-        await client.async_fetch_devices()
-    except MikrotikAuthError as err:
-        raise InvalidAuth from err
-    except MikrotikApiError as err:
-        raise CannotConnect from err
-
-
-async def _async_discover_backend_url(
-    hass: HomeAssistant,
-    api_key: str | None = None,
-) -> str | None:
-    """Auto-discover backend URL with supervisor hint and fallback candidates."""
-    supervisor_candidates = await _async_try_supervisor_discovery(hass)
-    if supervisor_candidates:
-        discovered = await _async_try_candidate_urls(
-            hass,
-            supervisor_candidates,
-            api_key,
+        return self.async_create_entry(
+            title=title,
+            data={
+                CONF_BASE_URL: base_url,
+                CONF_API_KEY: api_key,
+            },
         )
-        if discovered:
-            return discovered
 
-    return await _async_try_candidate_urls(hass, AUTO_DISCOVERY_CANDIDATES, api_key)
-
-
-async def _async_try_supervisor_discovery(hass: HomeAssistant) -> tuple[str, ...]:
-    """Discover likely backend URL candidates via Supervisor API."""
-    supervisor_token = os.environ.get("SUPERVISOR_TOKEN")
-    if not supervisor_token:
-        return ()
-
-    session = async_get_clientsession(hass)
-    try:
-        async with session.get(
-            "http://supervisor/addons",
-            headers={"Authorization": f"Bearer {supervisor_token}"},
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as response:
-            if response.status >= 400:
-                _LOGGER.debug(
-                    "Supervisor add-ons discovery failed with status %s",
-                    response.status,
-                )
-                return ()
-            payload = await response.json(content_type=None)
-    except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-        _LOGGER.debug("Supervisor add-ons discovery failed: %s", err)
-        return ()
-
-    add_ons = _extract_supervisor_addons(payload)
-    matched_add_on = _match_target_add_on(add_ons)
-    if matched_add_on is None:
-        _LOGGER.debug("Supervisor add-ons list does not contain %s", SUPERVISOR_ADDON_SLUG)
-        return ()
-
-    port = _extract_supervisor_add_on_port(matched_add_on)
-    return (f"http://homeassistant:{port}",)
-
-
-async def _async_try_candidate_urls(
-    hass: HomeAssistant,
-    candidates: Iterable[str],
-    api_key: str | None,
-) -> str | None:
-    """Try backend candidates and return the first valid URL."""
-    session = async_get_clientsession(hass)
-    checked: set[str] = set()
-    for raw_candidate in candidates:
+    async def _async_get_addon_info(self, addon_manager: Any) -> Any | None:
+        """Return add-on info or None when unavailable."""
         try:
-            candidate = _normalize_base_url(raw_candidate)
-        except CannotConnect:
-            continue
-        if candidate in checked:
-            continue
-        checked.add(candidate)
+            return await addon_manager.async_get_addon_info()
+        except AddonError as err:
+            _LOGGER.debug("Cannot load addon info for %s: %s", ADDON_SLUG, err)
+            return None
 
-        client = MikrotikPresenceClient(session, candidate, api_key)
+    async def _async_get_addon_base_url(self, addon_manager: Any) -> str | None:
+        """Return backend base URL from add-on discovery info."""
         try:
-            await client.async_fetch_devices()
-            return candidate
-        except MikrotikAuthError:
-            _LOGGER.debug("Backend candidate %s responded with auth error", candidate)
-            return candidate
-        except MikrotikApiError as err:
-            _LOGGER.debug("Backend candidate %s is not available: %s", candidate, err)
+            discovery = await addon_manager.async_get_addon_discovery_info()
+        except AddonError as err:
+            _LOGGER.debug("Cannot load addon discovery info for %s: %s", ADDON_SLUG, err)
+            return None
 
-    return None
+        if not isinstance(discovery, dict):
+            return None
 
+        return _build_base_url(discovery.get("host"), discovery.get("port"))
 
-def _extract_supervisor_addons(payload: Any) -> list[dict[str, Any]]:
-    """Extract add-ons list from Supervisor API response payload."""
-    if not isinstance(payload, dict):
-        return []
+    async def _async_wait_for_addon_base_url(
+        self,
+        addon_manager: Any,
+        attempts: int = 15,
+        delay_seconds: float = 2.0,
+    ) -> str | None:
+        """Wait until add-on exposes discovery info and backend responds."""
+        for _ in range(attempts):
+            base_url = await self._async_get_addon_base_url(addon_manager)
+            if base_url is not None:
+                return base_url
+            await asyncio.sleep(delay_seconds)
 
-    data = payload.get("data")
-    if isinstance(data, dict):
-        add_ons = data.get("addons")
-        if isinstance(add_ons, list):
-            return [item for item in add_ons if isinstance(item, dict)]
+        return None
 
-    add_ons = payload.get("addons")
-    if isinstance(add_ons, list):
-        return [item for item in add_ons if isinstance(item, dict)]
+    async def _async_can_connect(self, base_url: str, api_key: str | None) -> bool:
+        """Try to connect to backend and validate API response."""
+        session = async_get_clientsession(self.hass)
+        url = f"{base_url.rstrip('/')}/api/devices"
 
-    return []
+        headers: dict[str, str] = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
 
-
-def _match_target_add_on(add_ons: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Find target add-on in Supervisor list by slug or name."""
-    slug_suffix = f"_{SUPERVISOR_ADDON_SLUG}"
-    for add_on in add_ons:
-        slug = (
-            _normalize_optional_string(add_on.get("slug"))
-            or _normalize_optional_string(add_on.get("addon"))
-            or _normalize_optional_string(add_on.get("id"))
-            or ""
-        ).lower()
-        name = (_normalize_optional_string(add_on.get("name")) or "").lower()
-
-        if slug == SUPERVISOR_ADDON_SLUG:
-            return add_on
-        if slug.endswith(slug_suffix):
-            return add_on
-        if "mikrotik presence" in name:
-            return add_on
-
-    return None
+        try:
+            async with session.get(
+                url,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as response:
+                if response.status != 200:
+                    return False
+                payload = await response.json(content_type=None)
+                return isinstance(payload, (list, dict))
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+            return False
 
 
-def _extract_supervisor_add_on_port(add_on: dict[str, Any]) -> int:
-    """Extract backend port from add-on payload."""
-    for key in ("ingress_port", "port"):
-        value = add_on.get(key)
-        if isinstance(value, int) and value > 0:
-            return value
-        if isinstance(value, str) and value.isdigit():
-            parsed = int(value)
-            if parsed > 0:
-                return parsed
+def _build_base_url(host: Any, port: Any) -> str | None:
+    """Build backend URL from discovery host/port values."""
+    host_value = _normalize_optional_string(host)
+    if not host_value:
+        return None
 
-    return DEFAULT_BACKEND_PORT
+    port_value: int | None = None
+    if isinstance(port, int):
+        port_value = port
+    elif isinstance(port, str):
+        stripped = port.strip()
+        if stripped.isdigit():
+            port_value = int(stripped)
+
+    if port_value is None or port_value <= 0:
+        return None
+
+    return f"http://{host_value}:{port_value}"
 
 
 def _normalize_base_url(raw_base_url: Any) -> str:
     """Normalize backend URL from user input."""
     base_url = str(raw_base_url or "").strip().rstrip("/")
     if not base_url:
-        raise CannotConnect("Base URL is empty")
+        raise ValueError("Base URL is empty")
     return base_url
 
 

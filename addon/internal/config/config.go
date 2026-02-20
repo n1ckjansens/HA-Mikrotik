@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	defaultHTTPAddr               = ":8099"
+	defaultHTTPAddr               = ":8080"
 	defaultDBPath                 = "/data/mikrotik_presence.db"
 	defaultFrontendDist           = "/app/frontend/dist"
 	defaultAddonOptionsPath       = "/data/options.json"
