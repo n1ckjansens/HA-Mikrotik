@@ -3,7 +3,7 @@
   "version": "v0.0.8",
   "slug": "mikrotik_presence",
   "description": "MikroTik RouterOS v7 device presence monitor",
-  "url": "https://github.com/example/mikrotik-presence",
+  "url": "https://github.com/n1ckjansens/HA-Mikrotik",
   "arch": ["aarch64", "amd64", "armv7"],
   "init": false,
   "startup": "application",
@@ -11,15 +11,7 @@
   "ingress": true,
   "ingress_port": 8080,
   "webui": "http://[HOST]:[PORT:8080]/",
-  "discovery": [
-    {
-      "service": "mikrotik_presence",
-      "config": {
-        "host": "[HOST]",
-        "port": 8080
-      }
-    }
-  ],
+  "discovery": ["mikrotik_presence"],
   "panel_icon": "mdi:router-wireless",
   "panel_title": "MikroTik Presence",
   "options": {
