@@ -1,5 +1,5 @@
 name: MikroTik Presence
-version: v0.0.7
+version: v0.0.8
 slug: mikrotik_presence
 description: MikroTik RouterOS v7 device presence monitor
 url: https://github.com/example/mikrotik-presence

@@ -1,7 +1,7 @@
 {
   "domain": "mikrotik_presence",
   "name": "MikroTik Presence",
-  "version": "v0.0.7",
+  "version": "v0.0.8",
   "documentation": "https://github.com/n1ckjansens/HA-Mikrotik",
   "issue_tracker": "https://github.com/n1ckjansens/HA-Mikrotik/issues",
   "requirements": [

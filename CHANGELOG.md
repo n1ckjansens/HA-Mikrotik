@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [v0.0.7] - 2026-02-20
+## [v0.0.8] - 2026-02-20
 
 ### Added
 - Added Home Assistant custom integration `mikrotik_presence` with:
@@ -19,16 +19,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - API health-check (`GET /api/devices`) before creating config entry
 
 ### Changed
-- Bumped add-on version to `v0.0.7`:
+- Bumped add-on version to `v0.0.8`:
   - `addon/config.json`
 - Added add-on discovery metadata and standardized add-on API port to `8080`:
   - `addon/config.json`
   - `addon/config.yaml`
   - `addon/Dockerfile`
   - `addon/internal/config/config.go`
-- Bumped custom integration version to `v0.0.7`:
+- Bumped custom integration version to `v0.0.8`:
   - `custom_components/mikrotik_presence/manifest.json`
-- Bumped frontend package version to `v0.0.7`:
+- Bumped frontend package version to `v0.0.8`:
   - `addon/frontend/package.json`
   - `addon/frontend/package-lock.json`
 
