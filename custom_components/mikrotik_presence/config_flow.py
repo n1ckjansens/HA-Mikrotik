@@ -203,28 +203,39 @@ class MikrotikPresenceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def _async_is_addon_installed(self, addon_manager: Any) -> bool:
-        """Return whether addon is installed."""
-        try:
-            return bool(await addon_manager.async_is_installed())
-        except AddonError as err:
-            _LOGGER.debug("Cannot determine add-on installation state for %s: %s", ADDON_SLUG, err)
+        """Return whether add-on is installed."""
+        addon_info = await self._async_get_addon_info(addon_manager)
+        if addon_info is None:
             return False
 
-    async def _async_get_addon_info(self, addon_manager: Any) -> dict[str, Any] | None:
-        """Return add-on info dict or None when unavailable."""
+        state = _normalize_addon_state(addon_info)
+        if state is not None:
+            return state != "not_installed"
+
+        if isinstance(addon_info, dict):
+            installed = addon_info.get("installed")
+            if isinstance(installed, bool):
+                return installed
+            return bool(addon_info.get("version"))
+
+        return True
+
+    async def _async_get_addon_info(self, addon_manager: Any) -> Any | None:
+        """Return add-on info or None when unavailable."""
         try:
             info = await addon_manager.async_get_addon_info()
         except AddonError as err:
             _LOGGER.debug("Cannot load addon info for %s: %s", ADDON_SLUG, err)
             return None
-        if isinstance(info, dict):
-            return info
-        return None
+        return info
 
     async def _async_get_addon_base_url(self, addon_manager: Any) -> str | None:
         """Return backend base URL from add-on discovery info."""
         addon_info = await self._async_get_addon_info(addon_manager)
-        if addon_info is not None and not addon_info.get("started", True):
+        state = _normalize_addon_state(addon_info) if addon_info is not None else None
+        if state is not None and state != "running":
+            return None
+        if state is None and isinstance(addon_info, dict) and not addon_info.get("started", True):
             return None
 
         try:
@@ -309,4 +320,21 @@ def _normalize_optional_string(value: Any) -> str | None:
     if value is None:
         return None
     normalized = str(value).strip()
+    return normalized or None
+
+
+def _normalize_addon_state(addon_info: Any) -> str | None:
+    """Normalize add-on state string from supervisor response."""
+    if addon_info is None:
+        return None
+
+    state = getattr(addon_info, "state", None)
+    if state is None and isinstance(addon_info, dict):
+        state = addon_info.get("state")
+
+    if state is None:
+        return None
+
+    raw_state = getattr(state, "value", state)
+    normalized = str(raw_state).strip().lower()
     return normalized or None
