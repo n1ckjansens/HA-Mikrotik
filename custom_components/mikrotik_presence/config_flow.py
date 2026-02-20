@@ -10,10 +10,11 @@ import aiohttp
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.components.hassio import AddonError, is_hassio
+from homeassistant.components.hassio import AddonError
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.hassio import is_hassio
 
 from .addon import get_addon_manager
 from .const import ADDON_NAME, ADDON_SLUG, CONF_API_KEY, CONF_BASE_URL, DOMAIN
