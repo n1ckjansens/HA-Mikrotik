@@ -110,7 +110,9 @@ func (a *Aggregator) Aggregate(snapshot *routeros.Snapshot) map[string]model.Obs
 		if obs.Interface == "" {
 			obs.Interface = arp.Interface
 		}
-		obs.ARPIsComplete = strings.Contains(strings.ToUpper(arp.Flags), "C")
+		if arp.Complete || strings.Contains(strings.ToUpper(arp.Flags), "C") {
+			obs.ARPIsComplete = true
+		}
 		if obs.IP == "" && arp.Address != "" {
 			obs.IP = arp.Address
 			subnetName := matcher.Match(arp.Address)

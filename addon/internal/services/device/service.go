@@ -113,7 +113,7 @@ func (s *Service) persistSnapshot(ctx context.Context, observed map[string]model
 		obs, hasObs := observed[mac]
 		_, isRegistered := registered[mac]
 
-		if !isRegistered && (!hasObs || obs.ConnectionStatus != model.ConnectionStatusOnline) {
+		if !isRegistered && !hasObs {
 			deleteMACs = append(deleteMACs, mac)
 			continue
 		}

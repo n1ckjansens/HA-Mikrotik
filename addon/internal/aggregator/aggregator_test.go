@@ -97,6 +97,38 @@ func TestAggregateDHCPIdleRecent(t *testing.T) {
 	}
 }
 
+func TestAggregateARPCompleteMarksOnline(t *testing.T) {
+	now := time.Date(2026, 2, 18, 12, 0, 0, 0, time.UTC)
+	agg := New(subnet.New(), fakeOUI{})
+
+	snap := &routeros.Snapshot{
+		FetchedAt: now,
+		ARP: []routeros.ARPEntry{
+			{
+				MAC:       "AA:BB:CC:DD:EE:77",
+				Address:   "192.168.88.77",
+				Interface: "bridge",
+				Complete:  true,
+			},
+		},
+		Addresses: []routeros.IPAddress{
+			{Address: "192.168.88.1/24"},
+		},
+	}
+
+	items := agg.Aggregate(snap)
+	item, ok := items["AA:BB:CC:DD:EE:77"]
+	if !ok {
+		t.Fatalf("expected arp-complete device")
+	}
+	if !item.Online {
+		t.Fatalf("expected arp-complete device online")
+	}
+	if item.ConnectionStatus != "ONLINE" {
+		t.Fatalf("expected ONLINE, got %s", item.ConnectionStatus)
+	}
+}
+
 func TestParseRouterOSDuration(t *testing.T) {
 	cases := map[string]time.Duration{
 		"5s":       5 * time.Second,

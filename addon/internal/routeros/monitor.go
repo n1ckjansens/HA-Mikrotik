@@ -44,6 +44,8 @@ type ARPEntry struct {
 	MAC       string
 	Address   string
 	Interface string
+	Complete  bool
+	Status    string
 	Flags     string
 }
 
@@ -88,7 +90,7 @@ func (c *Client) FetchSnapshot(ctx context.Context) (*Snapshot, error) {
 	snapshot.Bridge = mapBridgeRows(bridgeRows)
 
 	arpRows, err := c.RunCommand(ctx, "/ip/arp/print", map[string]string{
-		".proplist": "mac-address,address,interface,flags",
+		".proplist": "mac-address,address,interface,complete,status,flags",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fetch arp: %w", err)
@@ -221,7 +223,11 @@ func mapARPRows(rows []map[string]string) []ARPEntry {
 			MAC:       mac,
 			Address:   strings.TrimSpace(row["address"]),
 			Interface: strings.TrimSpace(row["interface"]),
-			Flags:     strings.TrimSpace(row["flags"]),
+			Complete: boolFromWord(row["complete"]) ||
+				strings.EqualFold(strings.TrimSpace(row["status"]), "complete") ||
+				strings.Contains(strings.ToUpper(strings.TrimSpace(row["flags"])), "C"),
+			Status: strings.TrimSpace(row["status"]),
+			Flags:  strings.TrimSpace(row["flags"]),
 		})
 	}
 	return items
